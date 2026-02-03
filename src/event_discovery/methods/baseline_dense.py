@@ -6,15 +6,21 @@ Apply Vision-Language Model to all windows.
 import base64
 import io
 import logging
-import numpy as np
 from typing import List, Optional
 
-from ..core.video_processor import VideoWindow, VideoProcessor
+import numpy as np
+
+from ..core.video_processor import VideoWindow
+from ..core.base import BaseEventDetector
 
 logger = logging.getLogger(__name__)
 
 
-class DenseVLMMethod:
+class VLMScoringError(Exception):
+    """Raised when VLM scoring fails for a window."""
+
+
+class DenseVLMMethod(BaseEventDetector):
     """
     Dense VLM baseline: Apply VLM to every window.
 
@@ -31,11 +37,10 @@ class DenseVLMMethod:
         api_key: Optional[str] = None,
         use_local: bool = False,
     ):
-        self.top_k = top_k
+        super().__init__(top_k=top_k, diversity_weight=0.0)
         self.model = model
         self.api_key = api_key
         self.use_local = use_local
-        self.processor = VideoProcessor()
         self.client = None
 
         if not use_local and api_key is None:
@@ -44,42 +49,32 @@ class DenseVLMMethod:
         if not use_local:
             try:
                 import openai
-
                 self.client = openai.OpenAI(api_key=api_key)
             except ImportError:
                 raise ImportError(
-                    "openai package required. Install with: pip install openai"
+                    "openai package required. Install with: pip install event-discovery[vlm]"
                 )
 
-    def process_video(self, video_path: str) -> List[VideoWindow]:
-        """Main pipeline: chunk -> score all windows -> select top-k."""
-        windows = self.processor.chunk_video(video_path)
-        logger.info("Chunked video into %d windows", len(windows))
-
-        logger.info("Scoring all windows with VLM...")
-        scores = self.score_all_windows(windows)
-
-        top_indices = np.argsort(scores)[-self.top_k :][::-1]
-        selected = [windows[i] for i in top_indices]
-
-        logger.info("Selected top-%d events", len(selected))
-        return selected
-
-    def score_all_windows(self, windows: List[VideoWindow]) -> np.ndarray:
+    def _score_windows(self, windows: List[VideoWindow]) -> np.ndarray:
         """Score all windows using VLM."""
         scores = []
         for i, window in enumerate(windows):
             if i % 10 == 0:
-                logger.info("  Processing window %d/%d", i, len(windows))
+                logger.info("  Scoring window %d/%d", i, len(windows))
             try:
-                score = self.score_window(window)
+                score = self._score_window(window)
                 scores.append(score)
-            except Exception as e:
-                logger.warning("  Error processing window %d: %s", i, e)
+            except VLMScoringError as e:
+                logger.warning("Failed to score window %d: %s", i, e)
                 scores.append(0.0)
         return np.array(scores)
 
-    def score_window(self, window: VideoWindow) -> float:
+    def _select(self, windows: List[VideoWindow], scores: np.ndarray) -> List[VideoWindow]:
+        """Select top-k by score (no diversity penalty for VLM method)."""
+        top_indices = np.argsort(scores)[-self.top_k:][::-1]
+        return [windows[i] for i in top_indices]
+
+    def _score_window(self, window: VideoWindow) -> float:
         """Score a single window. Returns 0-1."""
         if self.use_local:
             return self._score_with_local_model(window)
@@ -120,11 +115,11 @@ class DenseVLMMethod:
                 model=self.model, messages=messages, max_tokens=10, temperature=0.0
             )
             score_text = response.choices[0].message.content.strip()
-            score = float(score_text) / 10.0
-            return score
+            return float(score_text) / 10.0
+        except (ValueError, AttributeError, IndexError) as e:
+            raise VLMScoringError(f"Failed to parse VLM response: {e}") from e
         except Exception as e:
-            logger.warning("API error: %s", e)
-            return 0.0
+            raise VLMScoringError(f"API request failed: {e}") from e
 
     def _score_with_local_model(self, window: VideoWindow) -> float:
         """Score window using local VLM. Not yet implemented."""

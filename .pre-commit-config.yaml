@@ -1,0 +1,16 @@
+repos:
+  - repo: local
+    hooks:
+      - id: naming-conventions
+        name: Check naming conventions
+        entry: python scripts/validate_naming.py src/ tests/
+        language: python
+        pass_filenames: false
+        always_run: true
+
+      - id: pytest
+        name: Run tests
+        entry: python -m pytest tests/ -x -q
+        language: python
+        pass_filenames: false
+        always_run: true

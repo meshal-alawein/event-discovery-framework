@@ -3,7 +3,7 @@
 from .hierarchical_energy import HierarchicalEnergyMethod, EnergyConfig
 from .geometric_outlier import GeometricOutlierMethod
 from .optimization_sparse import PureOptimizationMethod, OptimizationConfig
-from .baseline_dense import DenseVLMMethod
+from .baseline_dense import DenseVLMMethod, VLMScoringError
 
 __all__ = [
     "HierarchicalEnergyMethod",
@@ -12,4 +12,5 @@ __all__ = [
     "PureOptimizationMethod",
     "OptimizationConfig",
     "DenseVLMMethod",
+    "VLMScoringError",
 ]

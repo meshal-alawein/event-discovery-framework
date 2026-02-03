@@ -4,12 +4,19 @@ Direct sparse selection without hierarchical filtering.
 """
 
 import logging
-import numpy as np
-import cv2
 from typing import List, Dict
 from dataclasses import dataclass
 
-from ..core.video_processor import VideoWindow, VideoProcessor
+import numpy as np
+
+from ..core.video_processor import VideoWindow
+from ..core.base import BaseEventDetector
+from ..core.features import (
+    compute_edge_density_variance,
+    compute_pixel_variance,
+    compute_pixel_entropy,
+    normalize_features_batch,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +31,11 @@ class OptimizationConfig:
 
     top_k: int = 10
     diversity_weight: float = 0.5
+    similarity_sigma: float = 10.0
+
+    # Edge detection thresholds
+    canny_low: int = 100
+    canny_high: int = 200
 
     def normalize_weights(self):
         """Ensure weights sum to 1."""
@@ -34,7 +46,7 @@ class OptimizationConfig:
             self.weight_uncertainty /= total
 
 
-class PureOptimizationMethod:
+class PureOptimizationMethod(BaseEventDetector):
     """
     Pure optimization without hierarchical filtering.
 
@@ -47,83 +59,39 @@ class PureOptimizationMethod:
     def __init__(self, config: OptimizationConfig = None):
         self.config = config or OptimizationConfig()
         self.config.normalize_weights()
-        self.processor = VideoProcessor()
+        super().__init__(
+            top_k=self.config.top_k,
+            diversity_weight=self.config.diversity_weight,
+            sigma=self.config.similarity_sigma,
+        )
 
-    def process_video(self, video_path: str) -> List[VideoWindow]:
-        """Main pipeline: extract features -> score -> optimize."""
-        windows = self.processor.chunk_video(video_path)
-        logger.info("Chunked video into %d windows", len(windows))
+    def _score_windows(self, windows: List[VideoWindow]) -> np.ndarray:
+        """Compute scores for all windows at full fidelity."""
+        features = self._extract_all_features(windows)
+        return self._compute_scores(features)
 
-        logger.info("Computing features for all windows (no filtering)...")
-        features = self.extract_all_features(windows)
-
-        scores = self.compute_scores(features)
-        logger.info("Computed scores for %d windows", len(windows))
-
-        selected = self.sparse_select(windows, scores)
-        logger.info("Selected top-%d events via optimization", len(selected))
-
-        return selected
-
-    def extract_all_features(
+    def _extract_all_features(
         self, windows: List[VideoWindow]
     ) -> List[Dict[str, float]]:
         """Extract all features at maximum fidelity."""
-        features = []
+        raw_features = []
 
         for i, window in enumerate(windows):
             if i % 100 == 0:
                 logger.debug("  Processing window %d/%d", i, len(windows))
 
             feat = {
-                "novelty": self._compute_novelty(window),
-                "interaction": self._compute_interaction(window),
-                "uncertainty": self._compute_uncertainty(window),
+                "novelty": compute_pixel_variance(window.frames),
+                "interaction": compute_edge_density_variance(
+                    window.frames, self.config.canny_low, self.config.canny_high
+                ),
+                "uncertainty": compute_pixel_entropy(window.frames),
             }
-            features.append(feat)
+            raw_features.append(feat)
 
-        # Normalize features across the batch
-        for key in ["novelty", "interaction", "uncertainty"]:
-            values = np.array([f[key] for f in features])
-            mean_val = np.mean(values)
-            std_val = np.std(values)
+        return normalize_features_batch(raw_features)
 
-            for feat in features:
-                feat[key] = (
-                    (feat[key] - mean_val) / (std_val + 1e-6)
-                    if std_val > 1e-9
-                    else 0.0
-                )
-
-        return features
-
-    def _compute_novelty(self, window: VideoWindow) -> float:
-        """Novelty: variance in pixel values as proxy for unusualness."""
-        variances = [float(np.var(frame)) for frame in window.frames]
-        return float(np.mean(variances))
-
-    def _compute_interaction(self, window: VideoWindow) -> float:
-        """Interaction density: edge detection variance as proxy."""
-        edge_counts = []
-        for frame in window.frames:
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            edges = cv2.Canny(gray, 100, 200)
-            edge_counts.append(np.sum(edges > 0))
-
-        return float(np.std(edge_counts))
-
-    def _compute_uncertainty(self, window: VideoWindow) -> float:
-        """Model uncertainty: pixel value entropy as proxy."""
-        entropies = []
-        for frame in window.frames:
-            hist, _ = np.histogram(frame.flatten(), bins=256, range=(0, 256))
-            hist = hist / (hist.sum() + 1e-9)
-            entropy = -np.sum(hist * np.log(hist + 1e-9))
-            entropies.append(entropy)
-
-        return float(np.mean(entropies))
-
-    def compute_scores(self, features: List[Dict[str, float]]) -> np.ndarray:
+    def _compute_scores(self, features: List[Dict[str, float]]) -> np.ndarray:
         """S(W_i) = w_1*novelty + w_2*interaction + w_3*uncertainty"""
         scores = []
         for feat in features:
@@ -134,45 +102,3 @@ class PureOptimizationMethod:
             )
             scores.append(score)
         return np.array(scores)
-
-    def sparse_select(
-        self, windows: List[VideoWindow], scores: np.ndarray
-    ) -> List[VideoWindow]:
-        """Greedy sparse selection with diversity."""
-        selected_indices = []
-        remaining = list(range(len(windows)))
-
-        for _ in range(min(self.config.top_k, len(windows))):
-            if not remaining:
-                break
-
-            best_score = -np.inf
-            best_idx = None
-
-            for idx in remaining:
-                score = scores[idx]
-
-                if selected_indices:
-                    max_sim = max(
-                        self._temporal_similarity(windows[idx], windows[sel_idx])
-                        for sel_idx in selected_indices
-                    )
-                    score -= self.config.diversity_weight * max_sim
-
-                if score > best_score:
-                    best_score = score
-                    best_idx = idx
-
-            if best_idx is not None:
-                selected_indices.append(best_idx)
-                remaining.remove(best_idx)
-
-        return [windows[i] for i in selected_indices]
-
-    def _temporal_similarity(
-        self, w1: VideoWindow, w2: VideoWindow
-    ) -> float:
-        """Temporal similarity penalty: exp(-|t1 - t2| / sigma)"""
-        time_diff = abs(w1.start_time - w2.start_time)
-        sigma = 10.0
-        return float(np.exp(-time_diff / sigma))

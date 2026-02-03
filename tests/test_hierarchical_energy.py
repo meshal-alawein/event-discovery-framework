@@ -7,6 +7,12 @@ from event_discovery.methods.hierarchical_energy import (
     HierarchicalEnergyMethod,
     EnergyConfig,
 )
+from event_discovery.core.features import (
+    compute_edge_density_variance,
+    compute_pixel_variance,
+    temporal_similarity,
+    greedy_diverse_select,
+)
 
 
 class TestEnergyConfig:
@@ -53,55 +59,66 @@ class TestHierarchicalEnergyMethod:
         assert isinstance(change, float)
         assert change >= 0
 
-    def test_interaction(self, sample_window):
-        method = HierarchicalEnergyMethod()
-        interaction = method._compute_interaction(sample_window)
+    def test_interaction_via_shared_util(self, sample_window):
+        interaction = compute_edge_density_variance(sample_window.frames)
         assert isinstance(interaction, float)
         assert interaction >= 0
 
-    def test_uncertainty(self, sample_window):
-        method = HierarchicalEnergyMethod()
-        uncertainty = method._compute_uncertainty(sample_window)
+    def test_uncertainty_via_shared_util(self, sample_window):
+        uncertainty = compute_pixel_variance(sample_window.frames)
         assert isinstance(uncertainty, float)
         assert uncertainty >= 0
 
     def test_extract_features(self, sample_windows):
         method = HierarchicalEnergyMethod()
-        features = method.extract_features(sample_windows[:5], level=0)
+        features = method._extract_features(sample_windows[:5], level=0)
         assert len(features) == 5
         assert "motion" in features[0]
         assert "scene_change" in features[0]
 
     def test_compute_energy(self, sample_windows):
         method = HierarchicalEnergyMethod()
-        features = method.extract_features(sample_windows[:5], level=0)
-        energies = method.compute_energy(features)
+        features = method._extract_features(sample_windows[:5], level=0)
+        energies = method._compute_energy(features)
         assert len(energies) == 5
         assert energies.dtype == np.float64
 
     def test_adaptive_threshold(self):
         method = HierarchicalEnergyMethod()
         energies = np.array([1.0, 2.0, 3.0, 4.0, 5.0])
-        threshold = method.adaptive_threshold(energies, level=0)
-        # mean=3.0, std~1.414, sigma_mult=2.0 -> 3.0 + 2.0*1.414 ≈ 5.83
+        threshold = method._adaptive_threshold(energies, level=0)
         assert threshold > np.mean(energies)
 
     def test_hierarchical_filter_reduces_candidates(self, sample_windows):
         config = EnergyConfig(sigma_multipliers=[1.0, 0.5, 0.0])
         method = HierarchicalEnergyMethod(config)
-        candidates = method.hierarchical_filter(sample_windows)
+        candidates = method._hierarchical_filter(sample_windows)
         assert len(candidates) <= len(sample_windows)
 
-    def test_sparse_select_respects_top_k(self, sample_windows):
+    def test_select_respects_top_k(self, sample_windows):
         config = EnergyConfig(top_k=3)
         method = HierarchicalEnergyMethod(config)
-        selected = method.sparse_select(sample_windows)
+        selected = method._select_from_candidates(sample_windows)
         assert len(selected) <= 3
 
-    def test_temporal_similarity(self, sample_windows):
-        method = HierarchicalEnergyMethod()
-        sim = method._temporal_similarity(sample_windows[0], sample_windows[1])
+    def test_temporal_similarity_shared(self, sample_windows):
+        sim = temporal_similarity(
+            sample_windows[0].start_time, sample_windows[1].start_time
+        )
         assert 0.0 <= sim <= 1.0
-        # Adjacent windows should have higher similarity
-        sim_far = method._temporal_similarity(sample_windows[0], sample_windows[-1])
+        sim_far = temporal_similarity(
+            sample_windows[0].start_time, sample_windows[-1].start_time
+        )
         assert sim > sim_far
+
+    def test_greedy_diverse_select(self, sample_windows):
+        scores = np.random.rand(len(sample_windows))
+        selected = greedy_diverse_select(sample_windows, scores, top_k=3)
+        assert len(selected) == 3
+
+
+class TestBaseEventDetector:
+    def test_inherits_base(self):
+        from event_discovery.core.base import BaseEventDetector
+        method = HierarchicalEnergyMethod()
+        assert isinstance(method, BaseEventDetector)

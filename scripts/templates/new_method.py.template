@@ -1,0 +1,71 @@
+"""
+Method N: {METHOD_NAME}
+{DESCRIPTION}
+"""
+
+import logging
+from typing import List
+
+import numpy as np
+
+from ..core.video_processor import VideoWindow
+from ..core.base import BaseEventDetector
+from ..core.features import (
+    compute_color_histogram,
+    compute_edge_density_variance,
+    compute_pixel_variance,
+    compute_pixel_entropy,
+    normalize_features_batch,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class {CLASS_NAME}(BaseEventDetector):
+    """
+    {DESCRIPTION}
+
+    Inherits from BaseEventDetector which provides:
+    - process_video() pipeline (chunk -> score -> select)
+    - _select() with greedy diverse selection
+
+    You only need to implement _score_windows().
+    """
+
+    def __init__(self, top_k: int = 10, **kwargs):
+        super().__init__(top_k=top_k, **kwargs)
+        # Add method-specific configuration here
+
+    def _score_windows(self, windows: List[VideoWindow]) -> np.ndarray:
+        """
+        Score each window. Higher score = more likely an event.
+
+        Args:
+            windows: List of video windows to score
+
+        Returns:
+            Array of scores, shape (len(windows),)
+        """
+        scores = []
+        for window in windows:
+            score = self._compute_score(window)
+            scores.append(score)
+        return np.array(scores)
+
+    def _compute_score(self, window: VideoWindow) -> float:
+        """
+        Compute event score for a single window.
+
+        TODO: Implement your scoring logic here.
+
+        Available shared utilities:
+        - compute_color_histogram(frame, bins=32) -> np.ndarray
+        - compute_edge_density_variance(frames) -> float
+        - compute_pixel_variance(frames) -> float
+        - compute_pixel_entropy(frames) -> float
+        - self.processor.compute_optical_flow(window) -> np.ndarray
+
+        Returns:
+            Score value (higher = more event-like)
+        """
+        raise NotImplementedError("Implement _compute_score()")

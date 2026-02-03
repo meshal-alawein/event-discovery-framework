@@ -3,8 +3,8 @@ Command-line interface for event discovery.
 """
 
 import logging
+
 import click
-from pathlib import Path
 
 
 @click.group()
@@ -80,6 +80,7 @@ def detect(video_path: str, top_k: int, method: str, output: str, annotations: s
 @click.option("--output-dir", "-o", default="results", help="Output directory")
 def compare(video_path: str, annotations_path: str, output_dir: str):
     """Run all methods and generate comparison table."""
+    from pathlib import Path
     from .evaluation import run_comparison, generate_latex_table
 
     df = run_comparison(video_path, annotations_path, output_dir)
@@ -89,7 +90,7 @@ def compare(video_path: str, annotations_path: str, output_dir: str):
     click.echo("=" * 70)
     click.echo(df.to_string(index=False))
 
-    latex_path = f"{output_dir}/tables/comparison_table.tex"
+    latex_path = str(Path(output_dir) / "tables" / "comparison_table.tex")
     generate_latex_table(df, latex_path)
     click.echo(f"\nLaTeX table saved to {latex_path}")
 

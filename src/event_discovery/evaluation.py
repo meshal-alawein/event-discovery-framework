@@ -5,10 +5,11 @@ Evaluation utilities: metrics computation and comparison.
 import json
 import logging
 import time
-import numpy as np
-import pandas as pd
 from pathlib import Path
 from typing import Dict, List
+
+import numpy as np
+import pandas as pd
 
 from .core.video_processor import VideoProcessor, VideoWindow
 from .methods.hierarchical_energy import HierarchicalEnergyMethod, EnergyConfig
@@ -18,10 +19,39 @@ from .methods.optimization_sparse import PureOptimizationMethod, OptimizationCon
 logger = logging.getLogger(__name__)
 
 
+class AnnotationError(Exception):
+    """Raised when annotation files are malformed."""
+
+
 def load_ground_truth(annotation_path: str) -> List[dict]:
-    """Load ground truth annotations."""
-    with open(annotation_path, "r") as f:
-        data = json.load(f)
+    """
+    Load ground truth annotations.
+
+    Args:
+        annotation_path: Path to JSON annotation file
+
+    Returns:
+        List of event dicts with start_time, end_time, label
+
+    Raises:
+        FileNotFoundError: If annotation file doesn't exist
+        AnnotationError: If JSON is malformed or missing required keys
+    """
+    path = Path(annotation_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Annotation file not found: {annotation_path}")
+
+    try:
+        with open(path, "r") as f:
+            data = json.load(f)
+    except json.JSONDecodeError as e:
+        raise AnnotationError(f"Invalid JSON in {annotation_path}: {e}") from e
+
+    if "events" not in data:
+        raise AnnotationError(
+            f"Annotation file missing 'events' key: {annotation_path}"
+        )
+
     return data["events"]
 
 
@@ -55,7 +85,7 @@ def compute_metrics(
     matched_gt = set()
 
     for det in detected:
-        best_iou = 0
+        best_iou = 0.0
         best_gt_idx = None
 
         for i, gt in enumerate(ground_truth):
@@ -111,8 +141,7 @@ def baseline_rule_based(
     for window in windows:
         flow = processor.compute_optical_flow(window)
         flow_magnitude = np.sqrt(flow[:, :, :, 0] ** 2 + flow[:, :, :, 1] ** 2)
-        score = float(np.mean(flow_magnitude))
-        scores.append(score)
+        scores.append(float(np.mean(flow_magnitude)))
 
     top_indices = np.argsort(scores)[-top_k:][::-1]
     return [windows[i] for i in top_indices]
@@ -124,63 +153,43 @@ def run_comparison(
     output_dir: str = "results",
 ) -> pd.DataFrame:
     """Run all methods and generate comparison table."""
-    Path(output_dir).mkdir(parents=True, exist_ok=True)
-    Path(f"{output_dir}/tables").mkdir(parents=True, exist_ok=True)
+    out = Path(output_dir)
+    tables_dir = out / "tables"
+    tables_dir.mkdir(parents=True, exist_ok=True)
 
     ground_truth = load_ground_truth(annotation_path)
     logger.info("Loaded %d ground truth events", len(ground_truth))
 
     results = []
 
-    # Method 1: Hierarchical Energy
-    logger.info("Running Method 1: Hierarchical Energy")
-    start = time.time()
-    method1 = HierarchicalEnergyMethod(EnergyConfig(top_k=10))
-    detected1 = method1.process_video(video_path)
-    elapsed1 = time.time() - start
-    metrics1 = compute_metrics(detected1, ground_truth)
-    results.append({"method": "Hierarchical Energy", **metrics1, "time_sec": elapsed1})
+    methods = [
+        ("Hierarchical Energy", lambda: HierarchicalEnergyMethod(EnergyConfig(top_k=10))),
+        ("Geometric Outlier", lambda: GeometricOutlierMethod(embedding_dim=32, outlier_method="knn", top_k=10)),
+        ("Pure Optimization", lambda: PureOptimizationMethod(OptimizationConfig(top_k=10))),
+    ]
 
-    # Method 2: Geometric Outlier
-    logger.info("Running Method 2: Geometric Outlier")
-    start = time.time()
-    method2 = GeometricOutlierMethod(embedding_dim=32, outlier_method="knn", top_k=10)
-    detected2 = method2.process_video(video_path)
-    elapsed2 = time.time() - start
-    metrics2 = compute_metrics(detected2, ground_truth)
-    results.append({"method": "Geometric Outlier", **metrics2, "time_sec": elapsed2})
+    for name, factory in methods:
+        logger.info("Running %s", name)
+        start = time.time()
+        detected = factory().process_video(video_path)
+        elapsed = time.time() - start
+        metrics = compute_metrics(detected, ground_truth)
+        results.append({"method": name, **metrics, "time_sec": elapsed})
 
-    # Method 3: Pure Optimization
-    logger.info("Running Method 3: Pure Optimization")
-    start = time.time()
-    method3 = PureOptimizationMethod(OptimizationConfig(top_k=10))
-    detected3 = method3.process_video(video_path)
-    elapsed3 = time.time() - start
-    metrics3 = compute_metrics(detected3, ground_truth)
-    results.append({"method": "Pure Optimization", **metrics3, "time_sec": elapsed3})
-
-    # Baseline: Uniform Sampling
-    logger.info("Running Baseline: Uniform Sampling")
-    start = time.time()
-    detected_uniform = baseline_uniform_sampling(video_path)
-    elapsed_uniform = time.time() - start
-    metrics_uniform = compute_metrics(detected_uniform, ground_truth)
-    results.append(
-        {"method": "Uniform Sampling", **metrics_uniform, "time_sec": elapsed_uniform}
-    )
-
-    # Baseline: Rule-Based
-    logger.info("Running Baseline: Rule-Based")
-    start = time.time()
-    detected_rules = baseline_rule_based(video_path)
-    elapsed_rules = time.time() - start
-    metrics_rules = compute_metrics(detected_rules, ground_truth)
-    results.append(
-        {"method": "Rule-Based", **metrics_rules, "time_sec": elapsed_rules}
-    )
+    # Baselines
+    for name, func in [
+        ("Uniform Sampling", lambda: baseline_uniform_sampling(video_path)),
+        ("Rule-Based", lambda: baseline_rule_based(video_path)),
+    ]:
+        logger.info("Running %s", name)
+        start = time.time()
+        detected = func()
+        elapsed = time.time() - start
+        metrics = compute_metrics(detected, ground_truth)
+        results.append({"method": name, **metrics, "time_sec": elapsed})
 
     df = pd.DataFrame(results)
-    csv_path = f"{output_dir}/tables/comparison_results.csv"
+    csv_path = tables_dir / "comparison_results.csv"
     df.to_csv(csv_path, index=False)
     logger.info("Results saved to %s", csv_path)
 
@@ -208,8 +217,8 @@ def generate_latex_table(df: pd.DataFrame, output_path: str):
 
     latex_table += "\\bottomrule\n\\end{tabular}\n\\end{table}\n"
 
-    Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-    with open(output_path, "w") as f:
-        f.write(latex_table)
+    out_path = Path(output_path)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_path.write_text(latex_table)
 
-    logger.info("LaTeX table saved to %s", output_path)
+    logger.info("LaTeX table saved to %s", out_path)

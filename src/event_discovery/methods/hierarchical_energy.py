@@ -4,12 +4,20 @@ Physics-inspired approach with multi-scale filtering.
 """
 
 import logging
-import numpy as np
-import cv2
 from typing import List, Dict
 from dataclasses import dataclass, field
 
-from ..core.video_processor import VideoWindow, VideoProcessor
+import numpy as np
+
+from ..core.video_processor import VideoWindow
+from ..core.base import BaseEventDetector
+from ..core.features import (
+    compute_color_histogram,
+    compute_edge_density_variance,
+    compute_pixel_variance,
+    normalize_features_batch,
+    greedy_diverse_select,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +32,7 @@ class EnergyConfig:
     weight_scene_change: float = 0.2
     weight_uncertainty: float = 0.2
 
-    # Adaptive threshold multipliers (sigma_l)
+    # Adaptive threshold multipliers (sigma_l) per level
     sigma_multipliers: List[float] = field(
         default_factory=lambda: [2.0, 1.5, 1.0]
     )
@@ -32,6 +40,14 @@ class EnergyConfig:
     # Sparse selection
     top_k: int = 10
     diversity_weight: float = 0.5
+    similarity_sigma: float = 10.0
+
+    # Edge detection thresholds
+    canny_low: int = 100
+    canny_high: int = 200
+
+    # Histogram bins
+    histogram_bins: int = 32
 
     def normalize_weights(self):
         """Ensure weights sum to 1."""
@@ -52,7 +68,7 @@ class EnergyConfig:
         return len(self.sigma_multipliers)
 
 
-class HierarchicalEnergyMethod:
+class HierarchicalEnergyMethod(BaseEventDetector):
     """
     Hierarchical energy-based event discovery.
 
@@ -65,36 +81,36 @@ class HierarchicalEnergyMethod:
     def __init__(self, config: EnergyConfig = None):
         self.config = config or EnergyConfig()
         self.config.normalize_weights()
-        self.processor = VideoProcessor()
+        super().__init__(
+            top_k=self.config.top_k,
+            diversity_weight=self.config.diversity_weight,
+            sigma=self.config.similarity_sigma,
+        )
 
     def process_video(self, video_path: str) -> List[VideoWindow]:
         """
-        Main pipeline: hierarchical filtering + sparse selection.
-
-        Args:
-            video_path: Path to video file
-
-        Returns:
-            List of top-k detected event windows
+        Override base pipeline to insert hierarchical filtering.
         """
         windows = self.processor.chunk_video(video_path)
         logger.info("Chunked video into %d windows", len(windows))
 
-        candidates = self.hierarchical_filter(windows)
+        candidates = self._hierarchical_filter(windows)
         logger.info("Filtered to %d candidates", len(candidates))
 
-        selected = self.sparse_select(candidates)
-        logger.info("Selected top-%d events", len(selected))
+        selected = self._select_from_candidates(candidates)
+        logger.info("Selected %d events", len(selected))
 
         return selected
 
-    def hierarchical_filter(
-        self, windows: List[VideoWindow]
-    ) -> List[VideoWindow]:
+    def _score_windows(self, windows: List[VideoWindow]) -> np.ndarray:
+        """Score windows using full energy computation at max fidelity."""
+        features = self._extract_features(windows, level=self.config.num_levels - 1)
+        return self._compute_energy(features)
+
+    def _hierarchical_filter(self, windows: List[VideoWindow]) -> List[VideoWindow]:
         """
         Multi-scale energy-based filtering.
 
-        Algorithm:
         for l = 0 to L:
             compute E_l(W_i) at fidelity level l
             filter: C_{l+1} = {W : E_l(W) > tau_l}
@@ -105,19 +121,15 @@ class HierarchicalEnergyMethod:
             if len(candidates) == 0:
                 break
 
-            logger.info(
-                "  Level %d: %d candidates", level, len(candidates)
-            )
+            logger.info("  Level %d: %d candidates", level, len(candidates))
 
-            features = self.extract_features(candidates, level=level)
-            energies = self.compute_energy(features)
-            tau = self.adaptive_threshold(energies, level)
+            features = self._extract_features(candidates, level=level)
+            energies = self._compute_energy(features)
+            tau = self._adaptive_threshold(energies, level)
 
             logger.info(
                 "    Threshold: %.3f (mean=%.3f, std=%.3f)",
-                tau,
-                np.mean(energies),
-                np.std(energies),
+                tau, np.mean(energies), np.std(energies),
             )
 
             mask = energies > tau
@@ -125,7 +137,7 @@ class HierarchicalEnergyMethod:
 
         return candidates
 
-    def extract_features(
+    def _extract_features(
         self, windows: List[VideoWindow], level: int = 0
     ) -> List[Dict[str, float]]:
         """
@@ -138,118 +150,40 @@ class HierarchicalEnergyMethod:
         raw_features = []
 
         for window in windows:
-            feat = {}
-            feat["motion"] = self._compute_motion_energy(window)
-            feat["scene_change"] = self._compute_scene_change(window)
-
-            if level >= 1:
-                feat["interaction"] = self._compute_interaction(window)
-            else:
-                feat["interaction"] = 0.0
-
-            if level >= 2:
-                feat["uncertainty"] = self._compute_uncertainty(window)
-            else:
-                feat["uncertainty"] = 0.0
-
+            feat = {
+                "motion": self._compute_motion_energy(window),
+                "scene_change": self._compute_scene_change(window),
+                "interaction": (
+                    compute_edge_density_variance(
+                        window.frames, self.config.canny_low, self.config.canny_high
+                    )
+                    if level >= 1
+                    else 0.0
+                ),
+                "uncertainty": (
+                    compute_pixel_variance(window.frames) if level >= 2 else 0.0
+                ),
+            }
             raw_features.append(feat)
 
-        # Normalize features across all windows (not incrementally)
-        features = self._normalize_features(raw_features)
-        return features
-
-    def _normalize_features(
-        self, raw_features: List[Dict[str, float]]
-    ) -> List[Dict[str, float]]:
-        """Z-score normalize features across the full batch."""
-        if not raw_features:
-            return raw_features
-
-        keys = raw_features[0].keys()
-        normalized = [{} for _ in raw_features]
-
-        for key in keys:
-            values = np.array([f[key] for f in raw_features])
-            mean_val = np.mean(values)
-            std_val = np.std(values)
-            for i, val in enumerate(values):
-                normalized[i][key] = (
-                    (val - mean_val) / (std_val + 1e-6) if std_val > 1e-9 else 0.0
-                )
-
-        return normalized
+        return normalize_features_batch(raw_features)
 
     def _compute_motion_energy(self, window: VideoWindow) -> float:
-        """
-        Motion energy: ||v_dot||^2 + ||v_ddot||^2
-
-        Physics: Kinetic deviation from steady-state
-        """
+        """Motion energy: ||v_dot||^2 + ||v_ddot||^2"""
         flow = self.processor.compute_optical_flow(window)
-
         velocity = np.sqrt(flow[:, :, :, 0] ** 2 + flow[:, :, :, 1] ** 2)
         v_mean = np.mean(velocity, axis=(1, 2))
-
         acceleration = np.diff(v_mean)
-
-        energy = float(np.sum(v_mean**2) + np.sum(acceleration**2))
-        return energy
+        return float(np.sum(v_mean**2) + np.sum(acceleration**2))
 
     def _compute_scene_change(self, window: VideoWindow) -> float:
-        """
-        Scene change magnitude: ||z_end - z_start||
+        """Scene change: L2 distance between start and end histograms."""
+        hist_start = compute_color_histogram(window.frames[0], bins=self.config.histogram_bins)
+        hist_end = compute_color_histogram(window.frames[-1], bins=self.config.histogram_bins)
+        return float(np.linalg.norm(hist_end - hist_start))
 
-        Physics: Phase transition magnitude
-        """
-        hist_start = self._frame_histogram(window.frames[0])
-        hist_end = self._frame_histogram(window.frames[-1])
-
-        distance = float(np.linalg.norm(hist_end - hist_start))
-        return distance
-
-    def _frame_histogram(self, frame: np.ndarray, bins: int = 32) -> np.ndarray:
-        """Compute normalized color histogram."""
-        hist_r = np.histogram(frame[:, :, 0], bins=bins, range=(0, 256))[0]
-        hist_g = np.histogram(frame[:, :, 1], bins=bins, range=(0, 256))[0]
-        hist_b = np.histogram(frame[:, :, 2], bins=bins, range=(0, 256))[0]
-        hist = np.concatenate([hist_r, hist_g, hist_b]).astype(np.float64)
-        return hist / (hist.sum() + 1e-6)
-
-    def _compute_interaction(self, window: VideoWindow) -> float:
-        """
-        Interaction density: proximity changes between objects.
-
-        Physics: Multi-agent coupling strength
-
-        Uses edge detection as a proxy for object presence.
-        """
-        edges = []
-        for frame in window.frames:
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            edge = cv2.Canny(gray, 100, 200)
-            edges.append(np.sum(edge > 0))
-
-        interaction = float(np.std(edges))
-        return interaction
-
-    def _compute_uncertainty(self, window: VideoWindow) -> float:
-        """
-        Model uncertainty: H(p(y|x))
-
-        Physics: Information entropy
-
-        Uses variance in pixel intensity as proxy.
-        """
-        variances = [float(np.var(frame)) for frame in window.frames]
-        uncertainty = float(np.mean(variances))
-        return uncertainty
-
-    def compute_energy(self, features: List[Dict[str, float]]) -> np.ndarray:
-        """
-        E(W_i) = sum alpha_k * phi_k(W_i)
-
-        Physics: Hamiltonian energy functional
-        """
+    def _compute_energy(self, features: List[Dict[str, float]]) -> np.ndarray:
+        """E(W_i) = sum alpha_k * phi_k(W_i)"""
         energies = []
         for feat in features:
             energy = (
@@ -259,75 +193,27 @@ class HierarchicalEnergyMethod:
                 + self.config.weight_uncertainty * feat.get("uncertainty", 0)
             )
             energies.append(energy)
-
         return np.array(energies)
 
-    def adaptive_threshold(self, energies: np.ndarray, level: int) -> float:
-        """
-        tau_l = mu(E) + sigma_l * std(E)
-
-        Adaptive based on energy distribution.
-        """
+    def _adaptive_threshold(self, energies: np.ndarray, level: int) -> float:
+        """tau_l = mean(E) + sigma_l * std(E)"""
         mean_energy = np.mean(energies)
         std_energy = np.std(energies)
         sigma_mult = self.config.sigma_multipliers[level]
-
         return float(mean_energy + sigma_mult * std_energy)
 
-    def sparse_select(
-        self, candidates: List[VideoWindow]
-    ) -> List[VideoWindow]:
-        """
-        Greedy sparse selection with diversity constraint.
-
-        Solve: max sum S(W_i) - lambda * sum sim(W_i, W_j)
-        """
-        if len(candidates) <= self.config.top_k:
+    def _select_from_candidates(self, candidates: List[VideoWindow]) -> List[VideoWindow]:
+        """Score filtered candidates and apply diverse selection."""
+        if len(candidates) <= self.top_k:
             return candidates
 
-        features = self.extract_features(candidates, level=2)
-        scores = self.compute_energy(features)
+        features = self._extract_features(candidates, level=self.config.num_levels - 1)
+        scores = self._compute_energy(features)
 
-        selected_indices = []
-        remaining = list(range(len(candidates)))
-
-        for _ in range(self.config.top_k):
-            if not remaining:
-                break
-
-            best_score = -np.inf
-            best_idx = None
-
-            for idx in remaining:
-                score = scores[idx]
-
-                if selected_indices:
-                    max_sim = max(
-                        self._temporal_similarity(
-                            candidates[idx], candidates[sel_idx]
-                        )
-                        for sel_idx in selected_indices
-                    )
-                    score -= self.config.diversity_weight * max_sim
-
-                if score > best_score:
-                    best_score = score
-                    best_idx = idx
-
-            if best_idx is not None:
-                selected_indices.append(best_idx)
-                remaining.remove(best_idx)
-
-        return [candidates[i] for i in selected_indices]
-
-    def _temporal_similarity(
-        self, w1: VideoWindow, w2: VideoWindow
-    ) -> float:
-        """
-        Temporal similarity: penalize adjacent windows.
-
-        sim(w1, w2) = exp(-|t1 - t2| / sigma)
-        """
-        time_diff = abs(w1.start_time - w2.start_time)
-        sigma = 10.0
-        return float(np.exp(-time_diff / sigma))
+        return greedy_diverse_select(
+            candidates=candidates,
+            scores=scores,
+            top_k=self.top_k,
+            diversity_weight=self.diversity_weight,
+            sigma=self.sigma,
+        )

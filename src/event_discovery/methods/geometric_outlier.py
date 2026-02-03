@@ -4,17 +4,20 @@ Embed windows into low-dimensional space and detect manifold deviations.
 """
 
 import logging
-import numpy as np
 from typing import List, Optional
+
+import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
-from ..core.video_processor import VideoWindow, VideoProcessor
+from ..core.video_processor import VideoWindow
+from ..core.base import BaseEventDetector
+from ..core.features import compute_color_histogram
 
 logger = logging.getLogger(__name__)
 
 
-class GeometricOutlierMethod:
+class GeometricOutlierMethod(BaseEventDetector):
     """
     Geometric outlier-based event discovery.
 
@@ -31,30 +34,25 @@ class GeometricOutlierMethod:
         outlier_method: str = "knn",
         k_neighbors: int = 10,
         top_k: int = 10,
+        histogram_bins: int = 32,
     ):
+        super().__init__(top_k=top_k, diversity_weight=0.0)
         self.embedding_dim = embedding_dim
         self.outlier_method = outlier_method
         self.k_neighbors = k_neighbors
-        self.top_k = top_k
-        self.processor = VideoProcessor()
+        self.histogram_bins = histogram_bins
         self.pca: Optional[PCA] = None
 
-    def process_video(self, video_path: str) -> List[VideoWindow]:
-        """Main pipeline: embed -> detect outliers -> select top-k."""
-        windows = self.processor.chunk_video(video_path)
-        logger.info("Chunked video into %d windows", len(windows))
-
+    def _score_windows(self, windows: List[VideoWindow]) -> np.ndarray:
+        """Embed windows and compute outlier scores."""
         embeddings = self.embed_windows(windows)
-        logger.info("Embedded windows into %d-D space", self.embedding_dim)
+        logger.info("Embedded windows into %d-D space", embeddings.shape[1])
+        return self.compute_outlier_scores(embeddings)
 
-        scores = self.compute_outlier_scores(embeddings)
-        logger.info("Computed outlier scores")
-
-        top_indices = np.argsort(scores)[-self.top_k :][::-1]
-        selected = [windows[i] for i in top_indices]
-        logger.info("Selected top-%d outliers", len(selected))
-
-        return selected
+    def _select(self, windows: List[VideoWindow], scores: np.ndarray) -> List[VideoWindow]:
+        """Select top-k by score (no diversity penalty for geometric method)."""
+        top_indices = np.argsort(scores)[-self.top_k:][::-1]
+        return [windows[i] for i in top_indices]
 
     def embed_windows(self, windows: List[VideoWindow]) -> np.ndarray:
         """
@@ -65,25 +63,20 @@ class GeometricOutlierMethod:
         """
         features = []
         for window in windows:
-            histograms = [self._compute_histogram(frame) for frame in window.frames]
+            histograms = [
+                compute_color_histogram(frame, bins=self.histogram_bins)
+                for frame in window.frames
+            ]
             mean_hist = np.mean(histograms, axis=0)
             features.append(mean_hist)
 
         features_array = np.stack(features)
 
-        n_components = min(self.embedding_dim, features_array.shape[0], features_array.shape[1])
+        n_components = min(
+            self.embedding_dim, features_array.shape[0], features_array.shape[1]
+        )
         self.pca = PCA(n_components=n_components)
-        embeddings = self.pca.fit_transform(features_array)
-
-        return embeddings
-
-    def _compute_histogram(self, frame: np.ndarray, bins: int = 32) -> np.ndarray:
-        """Compute normalized RGB color histogram."""
-        hist_r = np.histogram(frame[:, :, 0], bins=bins, range=(0, 256))[0]
-        hist_g = np.histogram(frame[:, :, 1], bins=bins, range=(0, 256))[0]
-        hist_b = np.histogram(frame[:, :, 2], bins=bins, range=(0, 256))[0]
-        hist = np.concatenate([hist_r, hist_g, hist_b]).astype(np.float64)
-        return hist / (hist.sum() + 1e-6)
+        return self.pca.fit_transform(features_array)
 
     def compute_outlier_scores(self, embeddings: np.ndarray) -> np.ndarray:
         """Compute outlier scores. Higher = more outlier-like."""
@@ -111,8 +104,7 @@ class GeometricOutlierMethod:
         nbrs.fit(embeddings)
 
         distances, _ = nbrs.kneighbors(embeddings)
-        scores = np.mean(distances[:, 1:], axis=1)
-        return scores
+        return np.mean(distances[:, 1:], axis=1)
 
     def _curvature_outlier(self, embeddings: np.ndarray) -> np.ndarray:
         """Trajectory curvature: angle between consecutive embedding vectors."""
@@ -127,8 +119,7 @@ class GeometricOutlierMethod:
                 continue
 
             cos_angle = np.dot(v1, v2) / norm_product
-            angle = np.arccos(np.clip(cos_angle, -1, 1))
-            scores[i] = angle
+            scores[i] = np.arccos(np.clip(cos_angle, -1, 1))
 
         if len(embeddings) > 2:
             scores[0] = scores[1]
