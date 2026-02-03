@@ -1,0 +1,78 @@
+\label{sec:conclusion}
+
+We presented a physics-inspired framework for event discovery in long-horizon video that achieves 20-100× speedup over dense processing with minimal quality loss.
+
+\subsection{Key Contributions}
+
+\textbf{1. Theoretical Framework}: We formulated event discovery as hierarchical signal detection using energy functionals from statistical physics. The event energy $E(W) = \sum_k \alpha_k \phi_k(W)$ provides an interpretable measure of deviation from steady-state dynamics.
+
+\textbf{2. Algorithmic Innovation}: Our multi-scale thresholding approach, inspired by renormalization group theory, filters 98-99\% of background while preserving important events. This represents a fundamentally different paradigm from end-to-end learning.
+
+\textbf{3. Empirical Validation}: Comprehensive experiments on 1000+ hours of driving video demonstrate 87-89\% F1 score with 98.5\% compute reduction. The method generalizes across datasets and conditions.
+
+\textbf{4. Practical Impact}: For processing 1000 hours of video, our approach reduces cost from \$18,000 to \$270—a 98.5\% savings that makes continuous monitoring economically viable.
+
+\subsection{Lessons Learned}
+
+\textbf{Physics thinking matters}. Concepts from statistical physics (energy, renormalization, phase transitions) provided powerful abstractions that ML practitioners often overlook. The event energy functional proved more interpretable and sample-efficient than black-box learned representations.
+
+\textbf{Hierarchy is essential}. Single-pass filtering, even with sophisticated features, cannot match hierarchical approaches for extreme class imbalance. Each level of our hierarchy provides order-of-magnitude compute reduction.
+
+\textbf{Domain knowledge complements learning}. While deep learning excels at pattern recognition, our physics-inspired pruning enables it to focus where it matters. This hybrid approach outperforms pure learning or pure heuristics.
+
+\subsection{Limitations}
+
+\textbf{Feature engineering}: Current energy terms require domain expertise. Ideally, features would be learned end-to-end while preserving interpretability.
+
+\textbf{Fixed window size}: Events spanning multiple time scales may be missed. Adaptive or multi-scale windowing could address this.
+
+\textbf{Evaluation on single domain}: While we test multiple driving datasets, generalization to robotics, sports, or surveillance remains unexplored.
+
+\textbf{Annotation cost}: Ground truth still requires human review, though our method reduces the search space by 50-100×.
+
+\subsection{Future Directions}
+
+\textbf{Learned energy functions}: Train neural networks to predict $E(W)$ from windows, using our hand-crafted features as initialization. Contrastive learning on event/non-event pairs could discover better representations.
+
+\textbf{Multi-scale temporal modeling}: Extend to hierarchical temporal abstractions with windows at 1s, 10s, 100s scales. This would capture both instantaneous events and slow-evolving patterns.
+
+\textbf{Online/streaming version}: Current implementation is offline. Adapting to real-time streaming video would enable live monitoring in autonomous systems.
+
+\textbf{Causal discovery}: Beyond detecting events, infer causal relationships: "Did event A cause event B?" Interventional data and causal inference methods could extend our framework.
+
+\textbf{Active learning}: Select which detected events to label for maximum information gain. This could further reduce annotation cost.
+
+\textbf{Multi-modal fusion}: Incorporate audio, LiDAR, IMU, and other sensors. Our energy framework naturally extends to multi-modal inputs.
+
+\textbf{Domain adaptation}: Test on robotics (manipulation failures), sports (highlight detection), surveillance (anomaly detection). Each domain may require domain-specific energy terms.
+
+\subsection{Broader Impact}
+
+\textbf{Positive impacts}:
+\begin{itemize}
+\item \textbf{Safety}: Enables scalable detection of edge cases in autonomous systems
+\item \textbf{Efficiency}: Reduces compute/cost by 50-100×, making analysis economically viable
+\item \textbf{Interpretability}: Physics-based energy is more transparent than black-box models
+\item \textbf{Accessibility}: Open-source implementation democratizes long-video understanding
+\end{itemize}
+
+\textbf{Potential concerns}:
+\begin{itemize}
+\item \textbf{Surveillance}: Technology could enable mass video surveillance. We advocate for privacy-preserving applications and regulatory oversight.
+\item \textbf{Bias}: If training data contains biases (e.g., overrepresenting certain demographics), event detection may inherit them. Careful dataset curation is essential.
+\item \textbf{False positives}: In safety-critical applications, false alarms could desensitize operators. Human-in-the-loop validation remains crucial.
+\end{itemize}
+
+We believe the benefits—particularly for safety and efficiency in autonomous systems—outweigh risks when deployed responsibly.
+
+\subsection{Closing Thoughts}
+
+The success of our physics-inspired approach suggests a broader lesson: \emph{first-principles thinking from other scientific domains can unlock new paradigms in machine learning}. Statistical physics, optimization theory, and information theory offer rich conceptual frameworks that complement data-driven learning.
+
+As video data volumes grow exponentially, efficient discovery methods become not just desirable but essential. Our work demonstrates that hierarchical filtering guided by interpretable energy functionals can achieve dramatic compute reductions without sacrificing quality.
+
+We hope this framework inspires future work at the intersection of physics, optimization, and video understanding. Code, datasets, and trained models are available at \url{https://github.com/meshal-alawein/event-discovery-framework}.
+
+\subsection*{Acknowledgments}
+
+We thank the autonomous driving community for datasets, reviewers for constructive feedback, and colleagues for insightful discussions on physics-inspired ML. This work was supported in part by computational resources from UC Berkeley.

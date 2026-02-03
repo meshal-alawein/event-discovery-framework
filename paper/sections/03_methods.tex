@@ -1,0 +1,193 @@
+\label{sec:methods}
+
+We present six approaches to event discovery, ranging from physics-inspired optimization (our main contribution) to standard baselines. This comparative framework reveals when and why different methods succeed.
+
+\subsection{Problem Formulation}
+
+Given video $V(t)$ of duration $T$, discretize into $N$ temporal windows:
+\begin{equation}
+V(t) \rightarrow \{W_1, W_2, \ldots, W_N\}
+\end{equation}
+where each $W_i$ spans $\delta t$ seconds (typically 1-5s).
+
+\textbf{Goal:} Select sparse subset $K \subset \{1,\ldots,N\}$ with $|K| \ll N$ such that:
+\begin{equation}
+K = \argmax_{|K| \leq k} \sum_{i \in K} S(W_i)
+\end{equation}
+where $S(W_i)$ measures event importance.
+
+\subsection{Method 1: Hierarchical Energy (Proposed)}
+
+\subsubsection{Event Energy Functional}
+
+Define scalar energy for each window:
+\begin{equation}
+E(W_i) = \sum_{j=1}^{d} \alpha_j \phi_j(W_i)
+\end{equation}
+
+where $\phi_j$ are normalized features:
+
+\begin{align}
+\phi_{\text{motion}}(W) &= \|\dot{v}(t)\|^2 + \|\ddot{v}(t)\|^2 \\
+\phi_{\text{interact}}(W) &= \sum_{\text{pairs}} \mathbb{1}[\text{proximity}(a,b) < \tau] \\
+\phi_{\text{scene}}(W) &= \|z(t_{\text{end}}) - z(t_{\text{start}})\| \\
+\phi_{\text{uncertain}}(W) &= H(p(y|x)) = -\sum_y p(y|x) \log p(y|x)
+\end{align}
+
+\textbf{Physical interpretation:}
+\begin{itemize}
+\item $E(W)$ analogous to Hamiltonian energy
+\item Background driving = ground state (low energy)
+\item Events = excited states (high energy)
+\item $\alpha_j$ = coupling constants
+\end{itemize}
+
+\subsubsection{Hierarchical Filtering}
+
+Apply multi-scale thresholding:
+
+\begin{algorithm}[h]
+\caption{Hierarchical Energy Filtering}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} Windows $\{W_i\}$, thresholds $\{\tau_0, \tau_1, \ldots, \tau_L\}$
+\STATE $C_0 \gets \{W_i\}$ \COMMENT{Initial candidates}
+\FOR{$\ell = 0$ to $L$}
+  \STATE Extract features at fidelity level $\ell$
+  \STATE Compute $E_\ell(W_i)$ for $W_i \in C_\ell$
+  \STATE $C_{\ell+1} \gets \{W_i : E_\ell(W_i) > \tau_\ell\}$
+  \IF{$|C_{\ell+1}| = 0$}
+    \STATE \textbf{break}
+  \ENDIF
+\ENDFOR
+\STATE \textbf{Return:} $C_L$
+\end{algorithmic}
+\end{algorithm}
+
+\textbf{Adaptive thresholding:}
+\begin{equation}
+\tau_\ell = \mu(E_\ell) + \sigma_\ell \cdot \sigma(E_\ell)
+\end{equation}
+where $\sigma_\ell$ decreases with level: $\sigma_0 = 2.0, \sigma_1 = 1.5, \sigma_2 = 1.0$.
+
+\textbf{Renormalization interpretation:} Each level corresponds to coarse-graining, with lower thresholds revealing finer-scale structure.
+
+\subsubsection{Sparse Selection}
+
+On filtered candidates $C_L$, solve:
+\begin{equation}
+K^* = \argmax_{K \subset C_L, |K| \leq k} \sum_{i \in K} S(W_i) - \lambda \sum_{i,j \in K, i \neq j} \text{sim}(W_i, W_j)
+\end{equation}
+
+Greedy algorithm:
+\begin{algorithm}[h]
+\caption{Greedy Sparse Selection}
+\begin{algorithmic}[1]
+\STATE \textbf{Input:} Candidates $C$, budget $k$
+\STATE $K \gets \emptyset$
+\WHILE{$|K| < k$ and $C \neq \emptyset$}
+  \STATE $i^* \gets \argmax_{i \in C} \left[S(W_i) - \lambda \max_{j \in K} \text{sim}(W_i, W_j)\right]$
+  \STATE $K \gets K \cup \{i^*\}$
+  \STATE $C \gets C \setminus \{i^*\}$
+\ENDWHILE
+\STATE \textbf{Return:} $K$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Method 2: Geometric Outlier Detection}
+
+Embed windows into low-dimensional space:
+\begin{equation}
+W_i \xrightarrow{f_\text{embed}} z_i \in \R^d
+\end{equation}
+
+\textbf{Embedding methods:}
+\begin{itemize}
+\item PCA on frame features
+\item Autoencoder bottleneck
+\item Temporal averaging of CLIP embeddings
+\end{itemize}
+
+\textbf{Outlier scoring:}
+\begin{align}
+S_{\text{distance}}(W_i) &= \|z_i - \mu\| \\
+S_{\text{density}}(W_i) &= -\log p(z_i) \text{ (Gaussian KDE)} \\
+S_{\text{curvature}}(W_i) &= \angle(z_{i-1}, z_i, z_{i+1})
+\end{align}
+
+\textbf{Manifold hypothesis:} Normal driving lies on low-dimensional attractor; events deviate.
+
+\subsection{Method 3: Pure Optimization (No Hierarchy)}
+
+Compute scores for all windows without filtering:
+\begin{equation}
+S(W_i) = w_1 \phi_{\text{novelty}}(W_i) + w_2 \phi_{\text{interact}}(W_i) + w_3 \phi_{\text{uncertain}}(W_i)
+\end{equation}
+
+Solve same sparse selection as Method 1, but on full window set.
+
+\textbf{Difference from Method 1:} No hierarchical pruning $\Rightarrow$ expensive for long videos.
+
+\subsection{Method 4: Uniform Sampling (Baseline)}
+
+Sample every $n$-th window:
+\begin{equation}
+K = \{i : i \mod n = 0\}
+\end{equation}
+
+\textbf{Pros:} Simple, deterministic, no compute overhead.
+
+\textbf{Cons:} Misses rare events, wastes budget on background.
+
+\subsection{Method 5: Dense VLM (Baseline)}
+
+Apply VLM to every window:
+\begin{equation}
+S(W_i) = \text{VLM}(W_i, \text{prompt})
+\end{equation}
+
+Select top-$k$ by VLM score.
+
+\textbf{Pros:} Maximum information per window.
+
+\textbf{Cons:} Prohibitively expensive (100$\times$ cost of Method 1).
+
+\subsection{Method 6: Rule-Based Heuristics (Baseline)}
+
+Hand-crafted rules:
+\begin{align}
+\text{flag}(W_i) = &\ \mathbb{1}[\text{lane\_cross}(W_i)] \\
+                   &+ \mathbb{1}[\|\ddot{v}\| > \tau_{\text{brake}}] \\
+                   &+ \mathbb{1}[\text{collision\_risk}(W_i)]
+\end{align}
+
+\textbf{Pros:} Fast, interpretable, domain knowledge.
+
+\textbf{Cons:} Brittle, misses novel failure modes.
+
+\subsection{Comparison Summary}
+
+\begin{table}[h]
+\centering
+\caption{Method Characteristics}
+\label{tab:methods}
+\begin{tabular}{lccc}
+\toprule
+Method & Compute & Interpret. & Supervision \\
+\midrule
+Hierarchical Energy & Low & High & Minimal \\
+Geometric Outlier & Med & Med & Embed only \\
+Pure Optimization & High & Med & Minimal \\
+Uniform Sampling & None & High & None \\
+Dense VLM & V. High & Low & Heavy \\
+Rule-Based & None & V. High & Domain \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Expected performance:}
+\begin{itemize}
+\item \textbf{High recall needed:} Methods 1, 5
+\item \textbf{Compute limited:} Methods 1, 6
+\item \textbf{Interpretability needed:} Methods 1, 6
+\item \textbf{Novel events:} Methods 1, 2, 5
+\end{itemize}
