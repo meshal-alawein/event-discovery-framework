@@ -1,0 +1,4 @@
+staleLabel: stale
+daysUntilStale: 60
+daysUntilClose: 14
+exemptLabels: [pinned, security]
