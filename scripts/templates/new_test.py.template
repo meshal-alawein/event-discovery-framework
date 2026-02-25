@@ -1,0 +1,28 @@
+"""Tests for {METHOD_NAME} method."""
+
+import numpy as np
+import pytest
+
+from event_discovery.methods.{MODULE_NAME} import {CLASS_NAME}
+from event_discovery.core.base import BaseEventDetector
+
+
+class Test{CLASS_NAME}:
+    def test_inherits_base(self):
+        method = {CLASS_NAME}()
+        assert isinstance(method, BaseEventDetector)
+
+    def test_score_windows(self, sample_windows):
+        method = {CLASS_NAME}(top_k=3)
+        scores = method._score_windows(sample_windows[:5])
+        assert len(scores) == 5
+        assert scores.dtype == np.float64
+
+    def test_process_end_to_end(self, sample_windows):
+        """Integration test using synthetic windows."""
+        method = {CLASS_NAME}(top_k=3)
+        # Note: process_video() requires a real video file.
+        # Test the scoring + selection pipeline directly:
+        scores = method._score_windows(sample_windows)
+        selected = method._select(sample_windows, scores)
+        assert len(selected) <= 3

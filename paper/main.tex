@@ -1,0 +1,69 @@
+\documentclass[11pt,twocolumn]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{siunitx}
+\usepackage[margin=1in]{geometry}
+
+% Theorem environments
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{proposition}{Proposition}
+\newtheorem{definition}{Definition}
+
+% Commands
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\argmax}{\operatornamewithlimits{argmax}}
+\newcommand{\argmin}{\operatornamewithlimits{argmin}}
+
+\title{
+  \textbf{Physics-Inspired Event Discovery in Long-Horizon Video:\\
+  A Hierarchical Optimization Approach}
+}
+
+\author{
+  Meshal Alshammari\\
+  UC Berkeley, Department of EECS\\
+  \texttt{meshal@berkeley.edu}
+}
+
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Long-horizon video understanding faces a fundamental challenge: semantically important events are rare, localized, and embedded in extensive low-information background. We present a physics-inspired framework that treats event discovery as a hierarchical signal detection and sparse optimization problem. By defining an event energy functional over temporal windows and applying multi-scale thresholding combined with geometric optimization, we achieve 20-100$\times$ compute reduction compared to dense approaches while maintaining 90\%+ recall. Our method draws on principles from statistical physics, renormalization theory, and variational optimization to provide an interpretable, efficient, and scalable solution. We demonstrate effectiveness on autonomous driving scenarios and provide comparative analysis against five baseline methods including uniform sampling, dense VLM processing, and pure geometric approaches. Code and demonstrations available at \url{https://github.com/mesham/event-discovery}.
+\end{abstract}
+
+\section{Introduction}
+\input{sections/01_introduction.tex}
+
+\section{Related Work}
+\input{sections/02_related_work.tex}
+
+\section{Methods}
+\input{sections/03_methods.tex}
+
+\section{Experiments}
+\input{sections/04_experiments.tex}
+
+\section{Results}
+\input{sections/05_results.tex}
+
+\section{Conclusion}
+\input{sections/06_conclusion.tex}
+
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

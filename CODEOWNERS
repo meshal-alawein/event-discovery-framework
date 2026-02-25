@@ -1,0 +1,16 @@
+# CODEOWNERS — Event Discovery Framework
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything
+* @meshal-alawein
+
+# Core framework — requires explicit approval
+src/event_discovery/core/  @meshal-alawein
+src/event_discovery/methods/hierarchical_energy.py  @meshal-alawein
+
+# Governance files — never auto-approve
+AGENTS.md  @meshal-alawein
+SSOT.md    @meshal-alawein
+
+# CI/CD changes
+.github/  @meshal-alawein

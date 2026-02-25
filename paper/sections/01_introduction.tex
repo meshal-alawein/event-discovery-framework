@@ -1,0 +1,43 @@
+Long-horizon video understanding is critical for autonomous systems, robotics, and safety-critical applications. Consider an autonomous vehicle recording hours of driving footage: identifying the few seconds containing traffic violations, near-misses, or unusual behaviors is essential for training, debugging, and regulatory compliance. However, this task faces fundamental challenges:
+
+\textbf{Extreme class imbalance.} Important events comprise $<$1\% of total video duration, creating a needle-in-haystack problem with signal-to-noise ratios exceeding 100:1.
+
+\textbf{Temporal reasoning.} Events unfold over multiple seconds, requiring causal understanding beyond single-frame recognition. Current video models struggle with temporal horizons beyond 30 seconds \cite{videomae}.
+
+\textbf{Computational constraints.} Processing hours of video with modern vision-language models (VLMs) is prohibitively expensive. A 1-hour video at 30 fps requires processing 108,000 frames, costing \$50-500 per video at current API prices.
+
+\textbf{Weak supervision.} Annotating long videos is labor-intensive. Human reviewers require 10-100$\times$ real-time to identify and label events accurately.
+
+\subsection{Our Approach}
+
+We reframe event discovery as a \emph{physics-inspired optimization problem} rather than an end-to-end perception task. Our key insights:
+
+\begin{enumerate}
+\item \textbf{Energy functional.} Define a scalar ``event energy'' measuring deviation from steady-state dynamics, analogous to Hamiltonians in physics.
+
+\item \textbf{Hierarchical pruning.} Apply multi-scale thresholding reminiscent of renormalization group methods, aggressively filtering background at coarse scales.
+
+\item \textbf{Sparse optimization.} Select minimal event set via submodular maximization, ensuring coverage and diversity.
+
+\item \textbf{Geometric interpretation.} Treat events as manifold deviations in embedding space, enabling outlier detection.
+\end{enumerate}
+
+This approach achieves:
+\begin{itemize}
+\item \textbf{20-100$\times$ compute reduction} versus dense processing
+\item \textbf{90\%+ recall} on important events
+\item \textbf{Interpretable} energy terms and thresholds
+\item \textbf{Scalable} to hour-long videos on single GPU
+\end{itemize}
+
+\subsection{Contributions}
+
+\begin{enumerate}
+\item Novel physics-inspired formulation of video event discovery
+\item Hierarchical energy-based filtering framework with theoretical grounding
+\item Comprehensive comparison of six methods on autonomous driving data
+\item Open-source implementation and demonstration notebooks
+\item Analysis showing when different approaches succeed/fail
+\end{enumerate}
+
+The remainder of this paper is organized as follows: Section~\ref{sec:related} reviews related work, Section~\ref{sec:methods} presents our framework and comparative methods, Section~\ref{sec:experiments} describes experimental setup, Section~\ref{sec:results} analyzes results, and Section~\ref{sec:conclusion} concludes.

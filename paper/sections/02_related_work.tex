@@ -1,0 +1,49 @@
+\label{sec:related}
+
+Event discovery in long-horizon video intersects several research areas: video understanding, temporal action localization, anomaly detection, and efficient video processing.
+
+\subsection{Video Understanding and Temporal Modeling}
+
+Modern video understanding has advanced significantly with vision transformers and self-supervised learning. VideoMAE~\cite{videomae} and TimeSformer~\cite{timesformer} apply masked autoencoding and attention mechanisms to learn spatiotemporal representations. However, these models struggle with videos exceeding 30-60 seconds due to quadratic complexity in attention mechanisms~\cite{longformer}.
+
+For long-horizon understanding, recent work explores memory-augmented architectures~\cite{memvit} and hierarchical temporal abstractions~\cite{hierarchical_video}. Yet these approaches still require processing most frames, making them computationally prohibitive for hour-long videos.
+
+\subsection{Temporal Action Localization}
+
+Temporal action localization aims to identify start and end times of actions in untrimmed video~\cite{tal_survey}. Methods like BSN~\cite{bsn} and BMN~\cite{bmn} generate boundary proposals followed by classification. ActionFormer~\cite{actionformer} applies transformers to localize actions at multiple temporal scales.
+
+While related, our problem differs fundamentally: (1) we seek \emph{rare} events with extreme class imbalance, (2) ground truth is often unavailable or expensive, and (3) computational efficiency is paramount.
+
+\subsection{Anomaly Detection}
+
+Anomaly detection in video identifies unusual patterns deviating from normal behavior~\cite{video_anomaly_survey}. Deep learning approaches learn normal patterns via autoencoders~\cite{vae_anomaly} or prediction models~\cite{future_frame}, flagging reconstruction/prediction errors as anomalies.
+
+Our energy-based formulation shares philosophical similarities with these methods. However, we explicitly model multiple interpretable features (motion, interaction, scene change) rather than learning black-box representations. This interpretability proves crucial for safety-critical applications.
+
+\subsection{Efficient Video Processing}
+
+Given computational constraints, several works explore efficient video analysis. Adaptive frame sampling~\cite{adaptive_sampling} selects informative frames based on content. SCSampler~\cite{scsampler} uses reinforcement learning to optimize sampling policies. FrameExit~\cite{frameexit} employs early-exit networks to skip easy frames.
+
+Our hierarchical filtering approach is conceptually related but differs in key ways: (1) we filter at the \emph{window} level, not frames, (2) we use explicit physics-inspired energy rather than learned policies, and (3) we provide theoretical grounding via renormalization theory.
+
+\subsection{Physics-Inspired Machine Learning}
+
+Physics-inspired approaches in ML have gained traction recently. Hamiltonian Neural Networks~\cite{hnn} and Lagrangian Neural Networks~\cite{lnn} embed physical structure into architectures. Energy-based models~\cite{ebm_lecun} define learning as energy minimization.
+
+Our work extends this philosophy to \emph{algorithm design} rather than model architecture. We use physics concepts (energy functionals, renormalization, phase transitions) to guide the \emph{discovery process}, not to parameterize neural networks.
+
+\subsection{Submodular Optimization}
+
+Our sparse selection formulation relates to submodular maximization, well-studied in combinatorial optimization~\cite{submodular_survey}. Greedy algorithms achieve 1-1/e approximation for monotone submodular functions~\cite{nemhauser1978}. Recent work applies submodular optimization to video summarization~\cite{video_summarization_submodular} and diverse subset selection~\cite{diverse_submodular}.
+
+We leverage these theoretical guarantees while incorporating domain-specific diversity constraints (temporal separation, novelty).
+
+\subsection{Our Contribution}
+
+To our knowledge, this is the first work to:
+\begin{itemize}
+\item Formulate event discovery via physics-inspired energy functionals
+\item Apply renormalization-style hierarchical filtering to video
+\item Provide theoretical grounding connecting statistical physics, optimization, and video understanding
+\item Demonstrate 20-100$\times$ speedup with minimal quality loss on long-horizon video
+\end{itemize}

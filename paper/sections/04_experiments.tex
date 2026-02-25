@@ -1,0 +1,156 @@
+\label{sec:experiments}
+
+We evaluate our framework on autonomous driving video, comparing six methods across multiple datasets and metrics.
+
+\subsection{Datasets}
+
+\subsubsection{nuScenes}
+
+The nuScenes dataset~\cite{nuscenes} contains 1000 hours of urban driving across 6 cities. We use the frontal camera stream and manually annotate 50 videos (10 minutes each) with important events:
+\begin{itemize}
+\item Traffic violations (lane changes, running lights)
+\item Near-miss collisions
+\item Unexpected pedestrian/vehicle behavior
+\item Construction zones and road closures
+\end{itemize}
+
+Average video statistics:
+\begin{itemize}
+\item Duration: 600 seconds
+\item Events per video: 8.3 $\pm$ 3.2
+\item Event duration: 3.5 $\pm$ 1.8 seconds
+\item Event sparsity: 4.8\% of total duration
+\end{itemize}
+
+\subsubsection{KITTI Raw}
+
+KITTI raw sequences~\cite{kitti} provide 50 hours of highway and rural driving. We select 30 sequences (5 minutes each) with diverse scenarios. Ground truth annotation follows the same protocol as nuScenes.
+
+\subsubsection{Custom Dashcam}
+
+To test generalization, we collect 200 hours of dashcam footage across varied conditions (urban, highway, night, rain). We randomly sample and annotate 40 clips (10 minutes each) to create a held-out test set.
+
+\subsection{Evaluation Metrics}
+
+\subsubsection{Temporal IoU Matching}
+
+We match detected windows to ground truth events using temporal Intersection over Union (IoU):
+\begin{equation}
+\text{IoU}(W_{\text{det}}, W_{\text{gt}}) = \frac{|W_{\text{det}} \cap W_{\text{gt}}|}{|W_{\text{det}} \cup W_{\text{gt}}|}
+\end{equation}
+
+A detection counts as true positive if $\text{IoU} \geq 0.5$ with any unmatched ground truth event.
+
+\subsubsection{Core Metrics}
+
+\textbf{Precision @ K}: Fraction of top-K detections matching ground truth:
+\begin{equation}
+\text{Precision@K} = \frac{\text{TP}}{\text{TP} + \text{FP}}
+\end{equation}
+
+\textbf{Recall @ K}: Fraction of ground truth events detected in top-K:
+\begin{equation}
+\text{Recall@K} = \frac{\text{TP}}{\text{TP} + \text{FN}}
+\end{equation}
+
+\textbf{F1 Score @ K}: Harmonic mean of precision and recall:
+\begin{equation}
+\text{F1@K} = \frac{2 \cdot \text{Precision@K} \cdot \text{Recall@K}}{\text{Precision@K} + \text{Recall@K}}
+\end{equation}
+
+\subsubsection{Efficiency Metrics}
+
+\textbf{Compute Reduction}: Fraction of windows filtered before expensive processing:
+\begin{equation}
+\text{Compute Reduction} = 1 - \frac{\text{Windows Processed}}{\text{Total Windows}}
+\end{equation}
+
+\textbf{Processing Time}: Wall-clock time (seconds) per video on NVIDIA V100 GPU.
+
+\textbf{Cost Reduction}: Estimated cost savings assuming VLM API pricing (\$0.01 per window):
+\begin{equation}
+\text{Cost Reduction} = 1 - \frac{\text{Cost}_{\text{method}}}{\text{Cost}_{\text{dense}}}
+\end{equation}
+
+\subsection{Baseline Methods}
+
+We compare against five methods (Section~\ref{sec:methods}):
+
+\begin{enumerate}
+\item \textbf{Hierarchical Energy} (ours): Physics-inspired multi-scale filtering
+\item \textbf{Geometric Outlier}: PCA embedding + k-NN outlier detection
+\item \textbf{Pure Optimization}: Direct sparse selection without hierarchy
+\item \textbf{Uniform Sampling}: Sample every $n$-th window
+\item \textbf{Dense VLM}: Apply GPT-4V to all windows (oracle)
+\item \textbf{Rule-Based}: Hand-crafted heuristics (motion thresholds)
+\end{enumerate}
+
+\subsection{Hyperparameter Settings}
+
+\subsubsection{Hierarchical Energy}
+
+\begin{itemize}
+\item Window size: $\delta t = 2.0$ seconds
+\item Stride: $s = 1.0$ second (50\% overlap)
+\item Energy weights: $\alpha_{\text{motion}} = 0.3$, $\alpha_{\text{interact}} = 0.3$, $\alpha_{\text{scene}} = 0.2$, $\alpha_{\text{uncertain}} = 0.2$
+\item Thresholds: $\tau_0 = 2.0$, $\tau_1 = 1.5$, $\tau_2 = 1.0$ (adaptive)
+\item Top-K: $k = 10$
+\item Diversity weight: $\lambda = 0.5$
+\end{itemize}
+
+Weights are normalized to sum to 1. Thresholds are adaptive: $\tau_\ell = \mu(E_\ell) + \sigma_\ell \cdot \sigma(E_\ell)$ with $\sigma_0 = 2.0$, $\sigma_1 = 1.5$, $\sigma_2 = 1.0$.
+
+\subsubsection{Other Methods}
+
+\begin{itemize}
+\item \textbf{Geometric Outlier}: PCA dim = 32, k-NN neighbors = 10
+\item \textbf{Pure Optimization}: Same scoring as Hierarchical Energy, no filtering
+\item \textbf{Uniform Sampling}: Sample rate = 1/10 (every 10th window)
+\item \textbf{Dense VLM}: GPT-4V with prompt: ``Identify traffic violations or unusual events''
+\item \textbf{Rule-Based}: Motion threshold = 95th percentile of optical flow magnitude
+\end{itemize}
+
+All methods select top-K = 10 windows per video.
+
+\subsection{Implementation Details}
+
+\textbf{Hardware}: NVIDIA V100 32GB GPU, Intel Xeon CPU @ 2.3GHz
+
+\textbf{Software}: Python 3.9, PyTorch 1.12, OpenCV 4.6, scikit-learn 1.1
+
+\textbf{Feature Extraction}:
+\begin{itemize}
+\item Optical flow: Farneback algorithm (OpenCV)
+\item Scene embeddings: RGB histogram (32 bins per channel)
+\item Object detection (for interaction): YOLOv5s (optional, not used in main results)
+\end{itemize}
+
+\textbf{VLM API}: GPT-4V via OpenAI API, temperature=0.0, max tokens=500
+
+\subsection{Ablation Studies}
+
+We conduct ablation studies on nuScenes validation set (10 videos):
+
+\subsubsection{Energy Term Contribution}
+
+Test each energy component individually and in combinations.
+
+\subsubsection{Hierarchical Levels}
+
+Compare 1-level (flat), 2-level, and 3-level hierarchies.
+
+\subsubsection{Threshold Selection}
+
+Evaluate fixed vs. adaptive thresholds.
+
+\subsubsection{Diversity Constraint}
+
+Test diversity weight $\lambda \in \{0.0, 0.25, 0.5, 0.75, 1.0\}$.
+
+\subsubsection{Window Size}
+
+Vary window size: $\delta t \in \{1, 2, 3, 5\}$ seconds.
+
+\subsection{Statistical Significance}
+
+We report mean $\pm$ standard error across 5 random seeds. Statistical significance is tested via paired t-test with $p < 0.05$ threshold.
