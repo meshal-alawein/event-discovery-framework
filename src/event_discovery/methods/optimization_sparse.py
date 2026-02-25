@@ -4,19 +4,18 @@ Direct sparse selection without hierarchical filtering.
 """
 
 import logging
-from typing import List, Dict
 from dataclasses import dataclass
 
 import numpy as np
 
-from ..core.video_processor import VideoWindow
 from ..core.base import BaseEventDetector
 from ..core.features import (
     compute_edge_density_variance,
-    compute_pixel_variance,
     compute_pixel_entropy,
+    compute_pixel_variance,
     normalize_features_batch,
 )
+from ..core.video_processor import VideoWindow
 
 logger = logging.getLogger(__name__)
 
@@ -65,14 +64,14 @@ class PureOptimizationMethod(BaseEventDetector):
             sigma=self.config.similarity_sigma,
         )
 
-    def _score_windows(self, windows: List[VideoWindow]) -> np.ndarray:
+    def _score_windows(self, windows: list[VideoWindow]) -> np.ndarray:
         """Compute scores for all windows at full fidelity."""
         features = self._extract_all_features(windows)
         return self._compute_scores(features)
 
     def _extract_all_features(
-        self, windows: List[VideoWindow]
-    ) -> List[Dict[str, float]]:
+        self, windows: list[VideoWindow]
+    ) -> list[dict[str, float]]:
         """Extract all features at maximum fidelity."""
         raw_features = []
 
@@ -91,7 +90,7 @@ class PureOptimizationMethod(BaseEventDetector):
 
         return normalize_features_batch(raw_features)
 
-    def _compute_scores(self, features: List[Dict[str, float]]) -> np.ndarray:
+    def _compute_scores(self, features: list[dict[str, float]]) -> np.ndarray:
         """S(W_i) = w_1*novelty + w_2*interaction + w_3*uncertainty"""
         scores = []
         for feat in features:

@@ -4,11 +4,12 @@ Core video processing utilities for event discovery.
 
 import json
 import logging
-import numpy as np
-import cv2
-from pathlib import Path
-from typing import List, Optional
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Optional
+
+import cv2
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +20,7 @@ class VideoWindow:
     start_time: float
     end_time: float
     frames: np.ndarray  # Shape: (T, H, W, C)
-    frame_indices: List[int]
+    frame_indices: list[int]
 
     @property
     def duration(self) -> float:
@@ -44,7 +45,7 @@ class VideoProcessor:
         self.window_size = window_size
         self.stride = stride
 
-    def chunk_video(self, video_path: str) -> List[VideoWindow]:
+    def chunk_video(self, video_path: str) -> list[VideoWindow]:
         """
         Discretize video into temporal windows.
 
@@ -98,7 +99,7 @@ class VideoProcessor:
         logger.info("Chunked video into %d windows", len(windows))
         return windows
 
-    def load_annotations(self, annotation_path: str) -> List[dict]:
+    def load_annotations(self, annotation_path: str) -> list[dict]:
         """
         Load ground truth event annotations.
 
@@ -108,7 +109,7 @@ class VideoProcessor:
         Returns:
             List of event dictionaries with start_time, end_time, label
         """
-        with open(annotation_path, "r") as f:
+        with open(annotation_path) as f:
             annotations = json.load(f)
         return annotations["events"]
 
@@ -167,9 +168,9 @@ class VideoProcessor:
 
 def visualize_detections(
     video_path: str,
-    detected_windows: List[VideoWindow],
+    detected_windows: list[VideoWindow],
     output_path: str,
-    annotations: Optional[List[dict]] = None,
+    annotations: Optional[list[dict]] = None,
 ):
     """
     Create visualization video with detected events highlighted.

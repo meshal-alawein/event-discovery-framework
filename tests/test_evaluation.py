@@ -1,25 +1,25 @@
 """Tests for evaluation metrics and shared features."""
 
 import json
-import tempfile
+
 import numpy as np
 import pytest
 
-from event_discovery.core.video_processor import VideoWindow
 from event_discovery.core.features import (
     compute_color_histogram,
     compute_edge_density_variance,
-    compute_pixel_variance,
     compute_pixel_entropy,
+    compute_pixel_variance,
+    greedy_diverse_select,
     normalize_features_batch,
     temporal_similarity,
-    greedy_diverse_select,
 )
+from event_discovery.core.video_processor import VideoWindow
 from event_discovery.evaluation import (
-    compute_metrics,
-    temporal_iou,
-    load_ground_truth,
     AnnotationError,
+    compute_metrics,
+    load_ground_truth,
+    temporal_iou,
 )
 
 
@@ -194,8 +194,8 @@ class TestGeometricOutlier:
 class TestOptimizationSparse:
     def test_process(self, sample_windows):
         from event_discovery.methods.optimization_sparse import (
-            PureOptimizationMethod,
             OptimizationConfig,
+            PureOptimizationMethod,
         )
 
         config = OptimizationConfig(top_k=3)

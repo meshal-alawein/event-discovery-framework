@@ -6,15 +6,14 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Dict, List
 
 import numpy as np
 import pandas as pd
 
 from .core.video_processor import VideoProcessor, VideoWindow
-from .methods.hierarchical_energy import HierarchicalEnergyMethod, EnergyConfig
 from .methods.geometric_outlier import GeometricOutlierMethod
-from .methods.optimization_sparse import PureOptimizationMethod, OptimizationConfig
+from .methods.hierarchical_energy import EnergyConfig, HierarchicalEnergyMethod
+from .methods.optimization_sparse import OptimizationConfig, PureOptimizationMethod
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +22,7 @@ class AnnotationError(Exception):
     """Raised when annotation files are malformed."""
 
 
-def load_ground_truth(annotation_path: str) -> List[dict]:
+def load_ground_truth(annotation_path: str) -> list[dict]:
     """
     Load ground truth annotations.
 
@@ -42,7 +41,7 @@ def load_ground_truth(annotation_path: str) -> List[dict]:
         raise FileNotFoundError(f"Annotation file not found: {annotation_path}")
 
     try:
-        with open(path, "r") as f:
+        with open(path) as f:
             data = json.load(f)
     except json.JSONDecodeError as e:
         raise AnnotationError(f"Invalid JSON in {annotation_path}: {e}") from e
@@ -74,10 +73,10 @@ def temporal_iou(gt_event: dict, detected: VideoWindow) -> float:
 
 
 def compute_metrics(
-    detected: List[VideoWindow],
-    ground_truth: List[dict],
+    detected: list[VideoWindow],
+    ground_truth: list[dict],
     iou_threshold: float = 0.5,
-) -> Dict[str, float]:
+) -> dict[str, float]:
     """
     Compute precision, recall, F1 score using temporal IoU matching.
     """
@@ -122,7 +121,7 @@ def compute_metrics(
 
 def baseline_uniform_sampling(
     video_path: str, sample_rate: int = 10, top_k: int = 10
-) -> List[VideoWindow]:
+) -> list[VideoWindow]:
     """Baseline: Uniform sampling. Sample every N-th window."""
     processor = VideoProcessor()
     windows = processor.chunk_video(video_path)
@@ -132,7 +131,7 @@ def baseline_uniform_sampling(
 
 def baseline_rule_based(
     video_path: str, top_k: int = 10
-) -> List[VideoWindow]:
+) -> list[VideoWindow]:
     """Baseline: Rule-based heuristics using optical flow magnitude."""
     processor = VideoProcessor()
     windows = processor.chunk_video(video_path)

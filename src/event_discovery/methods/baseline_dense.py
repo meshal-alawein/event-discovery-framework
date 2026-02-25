@@ -6,12 +6,12 @@ Apply Vision-Language Model to all windows.
 import base64
 import io
 import logging
-from typing import List, Optional
+from typing import Optional
 
 import numpy as np
 
-from ..core.video_processor import VideoWindow
 from ..core.base import BaseEventDetector
+from ..core.video_processor import VideoWindow
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +53,9 @@ class DenseVLMMethod(BaseEventDetector):
             except ImportError:
                 raise ImportError(
                     "openai package required. Install with: pip install event-discovery[vlm]"
-                )
+                ) from None
 
-    def _score_windows(self, windows: List[VideoWindow]) -> np.ndarray:
+    def _score_windows(self, windows: list[VideoWindow]) -> np.ndarray:
         """Score all windows using VLM."""
         scores = []
         for i, window in enumerate(windows):
@@ -69,7 +69,7 @@ class DenseVLMMethod(BaseEventDetector):
                 scores.append(0.0)
         return np.array(scores)
 
-    def _select(self, windows: List[VideoWindow], scores: np.ndarray) -> List[VideoWindow]:
+    def _select(self, windows: list[VideoWindow], scores: np.ndarray) -> list[VideoWindow]:
         """Select top-k by score (no diversity penalty for VLM method)."""
         top_indices = np.argsort(scores)[-self.top_k:][::-1]
         return [windows[i] for i in top_indices]
@@ -83,7 +83,6 @@ class DenseVLMMethod(BaseEventDetector):
 
     def _score_with_openai(self, window: VideoWindow) -> float:
         """Score window using OpenAI GPT-4V."""
-        from PIL import Image
 
         key_frames = self._sample_key_frames(window, n_frames=4)
         encoded_frames = [self._encode_image(frame) for frame in key_frames]
@@ -127,7 +126,7 @@ class DenseVLMMethod(BaseEventDetector):
 
     def _sample_key_frames(
         self, window: VideoWindow, n_frames: int = 4
-    ) -> List[np.ndarray]:
+    ) -> list[np.ndarray]:
         """Sample key frames from window for VLM."""
         num_frames = len(window.frames)
         if num_frames <= n_frames:

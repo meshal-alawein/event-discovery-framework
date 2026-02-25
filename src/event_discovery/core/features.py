@@ -5,9 +5,9 @@ Provides common feature extraction functions used across multiple
 detection methods, eliminating code duplication.
 """
 
-import numpy as np
+
 import cv2
-from typing import List, Dict
+import numpy as np
 
 
 def compute_color_histogram(frame: np.ndarray, bins: int = 32) -> np.ndarray:
@@ -89,8 +89,8 @@ def compute_pixel_entropy(frames: np.ndarray, bins: int = 256) -> float:
 
 
 def normalize_features_batch(
-    raw_features: List[Dict[str, float]],
-) -> List[Dict[str, float]]:
+    raw_features: list[dict[str, float]],
+) -> list[dict[str, float]]:
     """
     Z-score normalize features across a batch.
 

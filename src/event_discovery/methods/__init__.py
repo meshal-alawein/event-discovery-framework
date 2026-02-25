@@ -1,9 +1,9 @@
 """Event discovery methods."""
 
-from .hierarchical_energy import HierarchicalEnergyMethod, EnergyConfig
-from .geometric_outlier import GeometricOutlierMethod
-from .optimization_sparse import PureOptimizationMethod, OptimizationConfig
 from .baseline_dense import DenseVLMMethod, VLMScoringError
+from .geometric_outlier import GeometricOutlierMethod
+from .hierarchical_energy import EnergyConfig, HierarchicalEnergyMethod
+from .optimization_sparse import OptimizationConfig, PureOptimizationMethod
 
 __all__ = [
     "HierarchicalEnergyMethod",

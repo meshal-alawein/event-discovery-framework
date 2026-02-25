@@ -32,10 +32,10 @@ def main(verbose: bool):
 @click.option("--annotations", "-a", default=None, help="Ground truth annotations JSON")
 def detect(video_path: str, top_k: int, method: str, output: str, annotations: str):
     """Detect events in a video."""
-    from .methods.hierarchical_energy import HierarchicalEnergyMethod, EnergyConfig
-    from .methods.geometric_outlier import GeometricOutlierMethod
-    from .methods.optimization_sparse import PureOptimizationMethod, OptimizationConfig
     from .core.video_processor import visualize_detections
+    from .methods.geometric_outlier import GeometricOutlierMethod
+    from .methods.hierarchical_energy import EnergyConfig, HierarchicalEnergyMethod
+    from .methods.optimization_sparse import OptimizationConfig, PureOptimizationMethod
 
     click.echo(f"Processing video: {video_path}")
     click.echo(f"Method: {method}, top_k: {top_k}")
@@ -81,7 +81,8 @@ def detect(video_path: str, top_k: int, method: str, output: str, annotations: s
 def compare(video_path: str, annotations_path: str, output_dir: str):
     """Run all methods and generate comparison table."""
     from pathlib import Path
-    from .evaluation import run_comparison, generate_latex_table
+
+    from .evaluation import generate_latex_table, run_comparison
 
     df = run_comparison(video_path, annotations_path, output_dir)
 

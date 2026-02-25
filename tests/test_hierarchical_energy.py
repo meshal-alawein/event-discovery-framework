@@ -3,15 +3,15 @@
 import numpy as np
 import pytest
 
-from event_discovery.methods.hierarchical_energy import (
-    HierarchicalEnergyMethod,
-    EnergyConfig,
-)
 from event_discovery.core.features import (
     compute_edge_density_variance,
     compute_pixel_variance,
-    temporal_similarity,
     greedy_diverse_select,
+    temporal_similarity,
+)
+from event_discovery.methods.hierarchical_energy import (
+    EnergyConfig,
+    HierarchicalEnergyMethod,
 )
 
 

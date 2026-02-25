@@ -7,12 +7,11 @@ to define their scoring logic while sharing the common pipeline.
 
 import logging
 from abc import ABC, abstractmethod
-from typing import List
 
 import numpy as np
 
-from .video_processor import VideoWindow, VideoProcessor
 from .features import greedy_diverse_select
+from .video_processor import VideoProcessor, VideoWindow
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,7 @@ class BaseEventDetector(ABC):
         self.sigma = sigma
         self.processor = VideoProcessor()
 
-    def process_video(self, video_path: str) -> List[VideoWindow]:
+    def process_video(self, video_path: str) -> list[VideoWindow]:
         """
         Main pipeline: chunk video -> score windows -> select top-k.
 
@@ -55,7 +54,7 @@ class BaseEventDetector(ABC):
         return selected
 
     @abstractmethod
-    def _score_windows(self, windows: List[VideoWindow]) -> np.ndarray:
+    def _score_windows(self, windows: list[VideoWindow]) -> np.ndarray:
         """
         Compute a relevance score for each window.
 
@@ -66,7 +65,7 @@ class BaseEventDetector(ABC):
             Array of scores, shape (len(windows),)
         """
 
-    def _select(self, windows: List[VideoWindow], scores: np.ndarray) -> List[VideoWindow]:
+    def _select(self, windows: list[VideoWindow], scores: np.ndarray) -> list[VideoWindow]:
         """
         Select top-k diverse windows. Can be overridden for custom selection.
         """

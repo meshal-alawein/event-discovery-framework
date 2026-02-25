@@ -1,9 +1,8 @@
 """Tests for core video processor."""
 
-import numpy as np
 import pytest
 
-from event_discovery.core.video_processor import VideoWindow, VideoProcessor
+from event_discovery.core.video_processor import VideoProcessor
 
 
 class TestVideoWindow:

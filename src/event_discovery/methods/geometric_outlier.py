@@ -4,15 +4,15 @@ Embed windows into low-dimensional space and detect manifold deviations.
 """
 
 import logging
-from typing import List, Optional
+from typing import Optional
 
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.neighbors import NearestNeighbors
 
-from ..core.video_processor import VideoWindow
 from ..core.base import BaseEventDetector
 from ..core.features import compute_color_histogram
+from ..core.video_processor import VideoWindow
 
 logger = logging.getLogger(__name__)
 
@@ -43,18 +43,18 @@ class GeometricOutlierMethod(BaseEventDetector):
         self.histogram_bins = histogram_bins
         self.pca: Optional[PCA] = None
 
-    def _score_windows(self, windows: List[VideoWindow]) -> np.ndarray:
+    def _score_windows(self, windows: list[VideoWindow]) -> np.ndarray:
         """Embed windows and compute outlier scores."""
         embeddings = self.embed_windows(windows)
         logger.info("Embedded windows into %d-D space", embeddings.shape[1])
         return self.compute_outlier_scores(embeddings)
 
-    def _select(self, windows: List[VideoWindow], scores: np.ndarray) -> List[VideoWindow]:
+    def _select(self, windows: list[VideoWindow], scores: np.ndarray) -> list[VideoWindow]:
         """Select top-k by score (no diversity penalty for geometric method)."""
         top_indices = np.argsort(scores)[-self.top_k:][::-1]
         return [windows[i] for i in top_indices]
 
-    def embed_windows(self, windows: List[VideoWindow]) -> np.ndarray:
+    def embed_windows(self, windows: list[VideoWindow]) -> np.ndarray:
         """
         Embed windows into low-dimensional space using PCA on color histograms.
 

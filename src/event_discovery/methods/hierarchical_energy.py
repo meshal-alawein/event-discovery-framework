@@ -4,20 +4,19 @@ Physics-inspired approach with multi-scale filtering.
 """
 
 import logging
-from typing import List, Dict
 from dataclasses import dataclass, field
 
 import numpy as np
 
-from ..core.video_processor import VideoWindow
 from ..core.base import BaseEventDetector
 from ..core.features import (
     compute_color_histogram,
     compute_edge_density_variance,
     compute_pixel_variance,
-    normalize_features_batch,
     greedy_diverse_select,
+    normalize_features_batch,
 )
+from ..core.video_processor import VideoWindow
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,7 @@ class EnergyConfig:
     weight_uncertainty: float = 0.2
 
     # Adaptive threshold multipliers (sigma_l) per level
-    sigma_multipliers: List[float] = field(
+    sigma_multipliers: list[float] = field(
         default_factory=lambda: [2.0, 1.5, 1.0]
     )
 
@@ -87,7 +86,7 @@ class HierarchicalEnergyMethod(BaseEventDetector):
             sigma=self.config.similarity_sigma,
         )
 
-    def process_video(self, video_path: str) -> List[VideoWindow]:
+    def process_video(self, video_path: str) -> list[VideoWindow]:
         """
         Override base pipeline to insert hierarchical filtering.
         """
@@ -102,12 +101,12 @@ class HierarchicalEnergyMethod(BaseEventDetector):
 
         return selected
 
-    def _score_windows(self, windows: List[VideoWindow]) -> np.ndarray:
+    def _score_windows(self, windows: list[VideoWindow]) -> np.ndarray:
         """Score windows using full energy computation at max fidelity."""
         features = self._extract_features(windows, level=self.config.num_levels - 1)
         return self._compute_energy(features)
 
-    def _hierarchical_filter(self, windows: List[VideoWindow]) -> List[VideoWindow]:
+    def _hierarchical_filter(self, windows: list[VideoWindow]) -> list[VideoWindow]:
         """
         Multi-scale energy-based filtering.
 
@@ -138,8 +137,8 @@ class HierarchicalEnergyMethod(BaseEventDetector):
         return candidates
 
     def _extract_features(
-        self, windows: List[VideoWindow], level: int = 0
-    ) -> List[Dict[str, float]]:
+        self, windows: list[VideoWindow], level: int = 0
+    ) -> list[dict[str, float]]:
         """
         Extract features at given fidelity level.
 
@@ -182,7 +181,7 @@ class HierarchicalEnergyMethod(BaseEventDetector):
         hist_end = compute_color_histogram(window.frames[-1], bins=self.config.histogram_bins)
         return float(np.linalg.norm(hist_end - hist_start))
 
-    def _compute_energy(self, features: List[Dict[str, float]]) -> np.ndarray:
+    def _compute_energy(self, features: list[dict[str, float]]) -> np.ndarray:
         """E(W_i) = sum alpha_k * phi_k(W_i)"""
         energies = []
         for feat in features:
@@ -202,7 +201,7 @@ class HierarchicalEnergyMethod(BaseEventDetector):
         sigma_mult = self.config.sigma_multipliers[level]
         return float(mean_energy + sigma_mult * std_energy)
 
-    def _select_from_candidates(self, candidates: List[VideoWindow]) -> List[VideoWindow]:
+    def _select_from_candidates(self, candidates: list[VideoWindow]) -> list[VideoWindow]:
         """Score filtered candidates and apply diverse selection."""
         if len(candidates) <= self.top_k:
             return candidates
