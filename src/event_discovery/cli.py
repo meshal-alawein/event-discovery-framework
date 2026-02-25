@@ -69,6 +69,7 @@ def detect(video_path: str, top_k: int, method: str, output: str, annotations: s
         gt = None
         if annotations:
             from .evaluation import load_ground_truth
+
             gt = load_ground_truth(annotations)
         visualize_detections(video_path, events, output, gt)
         click.echo(f"\nVisualization saved to {output}")

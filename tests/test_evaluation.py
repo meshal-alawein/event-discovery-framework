@@ -27,7 +27,8 @@ class TestTemporalIoU:
     def test_perfect_overlap(self):
         gt = {"start_time": 10.0, "end_time": 12.0}
         det = VideoWindow(
-            start_time=10.0, end_time=12.0,
+            start_time=10.0,
+            end_time=12.0,
             frames=np.zeros((1, 1, 1, 3), dtype=np.uint8),
             frame_indices=[0],
         )
@@ -36,7 +37,8 @@ class TestTemporalIoU:
     def test_no_overlap(self):
         gt = {"start_time": 10.0, "end_time": 12.0}
         det = VideoWindow(
-            start_time=20.0, end_time=22.0,
+            start_time=20.0,
+            end_time=22.0,
             frames=np.zeros((1, 1, 1, 3), dtype=np.uint8),
             frame_indices=[0],
         )
@@ -45,7 +47,8 @@ class TestTemporalIoU:
     def test_partial_overlap(self):
         gt = {"start_time": 10.0, "end_time": 12.0}
         det = VideoWindow(
-            start_time=11.0, end_time=13.0,
+            start_time=11.0,
+            end_time=13.0,
             frames=np.zeros((1, 1, 1, 3), dtype=np.uint8),
             frame_indices=[0],
         )
@@ -55,7 +58,8 @@ class TestTemporalIoU:
 class TestComputeMetrics:
     def _make_window(self, start, end):
         return VideoWindow(
-            start_time=start, end_time=end,
+            start_time=start,
+            end_time=end,
             frames=np.zeros((1, 1, 1, 3), dtype=np.uint8),
             frame_indices=[0],
         )
@@ -171,9 +175,7 @@ class TestSharedFeatures:
     def test_greedy_diverse_select_fewer_than_k(self):
         from event_discovery.core.video_processor import VideoWindow
 
-        windows = [
-            VideoWindow(0.0, 1.0, np.zeros((1, 1, 1, 3), dtype=np.uint8), [0])
-        ]
+        windows = [VideoWindow(0.0, 1.0, np.zeros((1, 1, 1, 3), dtype=np.uint8), [0])]
         scores = np.array([1.0])
         selected = greedy_diverse_select(windows, scores, top_k=5)
         assert len(selected) == 1

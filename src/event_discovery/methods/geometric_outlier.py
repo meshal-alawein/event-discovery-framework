@@ -51,7 +51,7 @@ class GeometricOutlierMethod(BaseEventDetector):
 
     def _select(self, windows: list[VideoWindow], scores: np.ndarray) -> list[VideoWindow]:
         """Select top-k by score (no diversity penalty for geometric method)."""
-        top_indices = np.argsort(scores)[-self.top_k:][::-1]
+        top_indices = np.argsort(scores)[-self.top_k :][::-1]
         return [windows[i] for i in top_indices]
 
     def embed_windows(self, windows: list[VideoWindow]) -> np.ndarray:
@@ -64,17 +64,14 @@ class GeometricOutlierMethod(BaseEventDetector):
         features = []
         for window in windows:
             histograms = [
-                compute_color_histogram(frame, bins=self.histogram_bins)
-                for frame in window.frames
+                compute_color_histogram(frame, bins=self.histogram_bins) for frame in window.frames
             ]
             mean_hist = np.mean(histograms, axis=0)
             features.append(mean_hist)
 
         features_array = np.stack(features)
 
-        n_components = min(
-            self.embedding_dim, features_array.shape[0], features_array.shape[1]
-        )
+        n_components = min(self.embedding_dim, features_array.shape[0], features_array.shape[1])
         self.pca = PCA(n_components=n_components)
         return self.pca.fit_transform(features_array)
 
@@ -147,8 +144,12 @@ def visualize_embedding_space(
 
     ax = axes[0]
     scatter = ax.scatter(
-        embeddings_2d[:, 0], embeddings_2d[:, 1],
-        c=labels, cmap="coolwarm", s=50, alpha=0.6,
+        embeddings_2d[:, 0],
+        embeddings_2d[:, 1],
+        c=labels,
+        cmap="coolwarm",
+        s=50,
+        alpha=0.6,
     )
     ax.set_title("Ground Truth Labels", fontsize=14, fontweight="bold")
     ax.set_xlabel("PC 1")
@@ -157,8 +158,12 @@ def visualize_embedding_space(
 
     ax = axes[1]
     scatter = ax.scatter(
-        embeddings_2d[:, 0], embeddings_2d[:, 1],
-        c=outlier_scores, cmap="viridis", s=50, alpha=0.6,
+        embeddings_2d[:, 0],
+        embeddings_2d[:, 1],
+        c=outlier_scores,
+        cmap="viridis",
+        s=50,
+        alpha=0.6,
     )
     ax.set_title("Outlier Scores", fontsize=14, fontweight="bold")
     ax.set_xlabel("PC 1")

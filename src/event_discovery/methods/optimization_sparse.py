@@ -69,9 +69,7 @@ class PureOptimizationMethod(BaseEventDetector):
         features = self._extract_all_features(windows)
         return self._compute_scores(features)
 
-    def _extract_all_features(
-        self, windows: list[VideoWindow]
-    ) -> list[dict[str, float]]:
+    def _extract_all_features(self, windows: list[VideoWindow]) -> list[dict[str, float]]:
         """Extract all features at maximum fidelity."""
         raw_features = []
 

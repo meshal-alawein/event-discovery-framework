@@ -47,9 +47,7 @@ def load_ground_truth(annotation_path: str) -> list[dict]:
         raise AnnotationError(f"Invalid JSON in {annotation_path}: {e}") from e
 
     if "events" not in data:
-        raise AnnotationError(
-            f"Annotation file missing 'events' key: {annotation_path}"
-        )
+        raise AnnotationError(f"Annotation file missing 'events' key: {annotation_path}")
 
     return data["events"]
 
@@ -103,11 +101,7 @@ def compute_metrics(
 
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-    f1 = (
-        2 * precision * recall / (precision + recall)
-        if (precision + recall) > 0
-        else 0.0
-    )
+    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
 
     return {
         "precision": precision,
@@ -129,9 +123,7 @@ def baseline_uniform_sampling(
     return sampled[:top_k]
 
 
-def baseline_rule_based(
-    video_path: str, top_k: int = 10
-) -> list[VideoWindow]:
+def baseline_rule_based(video_path: str, top_k: int = 10) -> list[VideoWindow]:
     """Baseline: Rule-based heuristics using optical flow magnitude."""
     processor = VideoProcessor()
     windows = processor.chunk_video(video_path)
@@ -163,7 +155,10 @@ def run_comparison(
 
     methods = [
         ("Hierarchical Energy", lambda: HierarchicalEnergyMethod(EnergyConfig(top_k=10))),
-        ("Geometric Outlier", lambda: GeometricOutlierMethod(embedding_dim=32, outlier_method="knn", top_k=10)),
+        (
+            "Geometric Outlier",
+            lambda: GeometricOutlierMethod(embedding_dim=32, outlier_method="knn", top_k=10),
+        ),
         ("Pure Optimization", lambda: PureOptimizationMethod(OptimizationConfig(top_k=10))),
     ]
 

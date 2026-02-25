@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class VideoWindow:
     """Represents a temporal window in a video."""
+
     start_time: float
     end_time: float
     frames: np.ndarray  # Shape: (T, H, W, C)
@@ -145,9 +146,7 @@ class VideoProcessor:
 
         return np.stack(flows)
 
-    def downsample_window(
-        self, window: VideoWindow, target_frames: int = 8
-    ) -> np.ndarray:
+    def downsample_window(self, window: VideoWindow, target_frames: int = 8) -> np.ndarray:
         """
         Downsample window to fixed number of frames for embedding.
 

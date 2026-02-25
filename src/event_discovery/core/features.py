@@ -5,7 +5,6 @@ Provides common feature extraction functions used across multiple
 detection methods, eliminating code duplication.
 """
 
-
 import cv2
 import numpy as np
 
@@ -111,9 +110,7 @@ def normalize_features_batch(
         mean_val = np.mean(values)
         std_val = np.std(values)
         for i, val in enumerate(values):
-            normalized[i][key] = (
-                (val - mean_val) / (std_val + 1e-6) if std_val > 1e-9 else 0.0
-            )
+            normalized[i][key] = (val - mean_val) / (std_val + 1e-6) if std_val > 1e-9 else 0.0
 
     return normalized
 

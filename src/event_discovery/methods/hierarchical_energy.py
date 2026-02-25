@@ -32,9 +32,7 @@ class EnergyConfig:
     weight_uncertainty: float = 0.2
 
     # Adaptive threshold multipliers (sigma_l) per level
-    sigma_multipliers: list[float] = field(
-        default_factory=lambda: [2.0, 1.5, 1.0]
-    )
+    sigma_multipliers: list[float] = field(default_factory=lambda: [2.0, 1.5, 1.0])
 
     # Sparse selection
     top_k: int = 10
@@ -128,7 +126,9 @@ class HierarchicalEnergyMethod(BaseEventDetector):
 
             logger.info(
                 "    Threshold: %.3f (mean=%.3f, std=%.3f)",
-                tau, np.mean(energies), np.std(energies),
+                tau,
+                np.mean(energies),
+                np.std(energies),
             )
 
             mask = energies > tau
@@ -159,9 +159,7 @@ class HierarchicalEnergyMethod(BaseEventDetector):
                     if level >= 1
                     else 0.0
                 ),
-                "uncertainty": (
-                    compute_pixel_variance(window.frames) if level >= 2 else 0.0
-                ),
+                "uncertainty": (compute_pixel_variance(window.frames) if level >= 2 else 0.0),
             }
             raw_features.append(feat)
 

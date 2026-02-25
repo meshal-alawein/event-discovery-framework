@@ -102,13 +102,9 @@ class TestHierarchicalEnergyMethod:
         assert len(selected) <= 3
 
     def test_temporal_similarity_shared(self, sample_windows):
-        sim = temporal_similarity(
-            sample_windows[0].start_time, sample_windows[1].start_time
-        )
+        sim = temporal_similarity(sample_windows[0].start_time, sample_windows[1].start_time)
         assert 0.0 <= sim <= 1.0
-        sim_far = temporal_similarity(
-            sample_windows[0].start_time, sample_windows[-1].start_time
-        )
+        sim_far = temporal_similarity(sample_windows[0].start_time, sample_windows[-1].start_time)
         assert sim > sim_far
 
     def test_greedy_diverse_select(self, sample_windows):
@@ -120,5 +116,6 @@ class TestHierarchicalEnergyMethod:
 class TestBaseEventDetector:
     def test_inherits_base(self):
         from event_discovery.core.base import BaseEventDetector
+
         method = HierarchicalEnergyMethod()
         assert isinstance(method, BaseEventDetector)

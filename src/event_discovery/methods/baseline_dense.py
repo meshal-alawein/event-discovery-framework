@@ -49,6 +49,7 @@ class DenseVLMMethod(BaseEventDetector):
         if not use_local:
             try:
                 import openai
+
                 self.client = openai.OpenAI(api_key=api_key)
             except ImportError:
                 raise ImportError(
@@ -71,7 +72,7 @@ class DenseVLMMethod(BaseEventDetector):
 
     def _select(self, windows: list[VideoWindow], scores: np.ndarray) -> list[VideoWindow]:
         """Select top-k by score (no diversity penalty for VLM method)."""
-        top_indices = np.argsort(scores)[-self.top_k:][::-1]
+        top_indices = np.argsort(scores)[-self.top_k :][::-1]
         return [windows[i] for i in top_indices]
 
     def _score_window(self, window: VideoWindow) -> float:
@@ -124,9 +125,7 @@ class DenseVLMMethod(BaseEventDetector):
         """Score window using local VLM. Not yet implemented."""
         raise NotImplementedError("Local VLM scoring not yet implemented")
 
-    def _sample_key_frames(
-        self, window: VideoWindow, n_frames: int = 4
-    ) -> list[np.ndarray]:
+    def _sample_key_frames(self, window: VideoWindow, n_frames: int = 4) -> list[np.ndarray]:
         """Sample key frames from window for VLM."""
         num_frames = len(window.frames)
         if num_frames <= n_frames:
