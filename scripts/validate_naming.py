@@ -19,7 +19,6 @@ import ast
 import re
 import sys
 from pathlib import Path
-from typing import List, Tuple
 
 SNAKE_CASE = re.compile(r"^[a-z][a-z0-9]*(_[a-z0-9]+)*$")
 PASCAL_CASE = re.compile(r"^[A-Z][a-zA-Z0-9]*$")
@@ -30,7 +29,7 @@ IGNORE_DIRS = {".git", ".venv", "__pycache__", ".pytest_cache", "node_modules", 
 IGNORE_FILES = {"__init__.py", "conftest.py"}
 
 
-def check_path_naming(root: Path) -> List[Tuple[str, str, str]]:
+def check_path_naming(root: Path) -> list[tuple[str, str, str]]:
     """Check file and directory naming conventions."""
     issues = []
 
@@ -43,14 +42,13 @@ def check_path_naming(root: Path) -> List[Tuple[str, str, str]]:
         if path.is_dir():
             if not SNAKE_CASE.match(name) and not name.startswith("."):
                 issues.append(("error", str(path), f"Directory '{name}' is not snake_case"))
-        elif path.suffix == ".py" and path.name not in IGNORE_FILES:
-            if not SNAKE_CASE.match(name):
-                issues.append(("error", str(path), f"Python file '{name}.py' is not snake_case"))
+        elif path.suffix == ".py" and path.name not in IGNORE_FILES and not SNAKE_CASE.match(name):
+            issues.append(("error", str(path), f"Python file '{name}.py' is not snake_case"))
 
     return issues
 
 
-def check_python_naming(filepath: Path) -> List[Tuple[str, str, str]]:
+def check_python_naming(filepath: Path) -> list[tuple[str, str, str]]:
     """Check naming conventions inside a Python file using AST."""
     issues = []
 
@@ -63,29 +61,35 @@ def check_python_naming(filepath: Path) -> List[Tuple[str, str, str]]:
     for node in ast.walk(tree):
         if isinstance(node, ast.ClassDef):
             if not PASCAL_CASE.match(node.name):
-                issues.append((
-                    "error",
-                    f"{filepath}:{node.lineno}",
-                    f"Class '{node.name}' is not PascalCase",
-                ))
+                issues.append(
+                    (
+                        "error",
+                        f"{filepath}:{node.lineno}",
+                        f"Class '{node.name}' is not PascalCase",
+                    )
+                )
 
-        elif isinstance(node, ast.FunctionDef) or isinstance(node, ast.AsyncFunctionDef):
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             name = node.name
             if DUNDER.match(name) or name.startswith("_"):
                 # Skip dunder methods and private methods (just check the base)
                 base = name.lstrip("_")
                 if base and not SNAKE_CASE.match(base) and not DUNDER.match(name):
-                    issues.append((
-                        "warning",
-                        f"{filepath}:{node.lineno}",
-                        f"Function '{name}' base is not snake_case",
-                    ))
+                    issues.append(
+                        (
+                            "warning",
+                            f"{filepath}:{node.lineno}",
+                            f"Function '{name}' base is not snake_case",
+                        )
+                    )
             elif not SNAKE_CASE.match(name):
-                issues.append((
-                    "error",
-                    f"{filepath}:{node.lineno}",
-                    f"Function '{name}' is not snake_case",
-                ))
+                issues.append(
+                    (
+                        "error",
+                        f"{filepath}:{node.lineno}",
+                        f"Function '{name}' is not snake_case",
+                    )
+                )
 
         elif isinstance(node, ast.Assign):
             # Check module-level constants
@@ -97,11 +101,13 @@ def check_python_naming(filepath: Path) -> List[Tuple[str, str, str]]:
                         continue
                     # If it looks like it's trying to be a constant (ALL_CAPS pattern with lowercase)
                     if name.isupper() and not UPPER_SNAKE.match(name):
-                        issues.append((
-                            "warning",
-                            f"{filepath}:{node.lineno}",
-                            f"Constant '{name}' is not UPPER_SNAKE_CASE",
-                        ))
+                        issues.append(
+                            (
+                                "warning",
+                                f"{filepath}:{node.lineno}",
+                                f"Constant '{name}' is not UPPER_SNAKE_CASE",
+                            )
+                        )
 
     return issues
 
