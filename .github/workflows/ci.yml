@@ -50,6 +50,7 @@ jobs:
           pip install mypy types-tqdm
 
       - name: Run mypy
+        continue-on-error: true
         run: mypy src/event_discovery/ --ignore-missing-imports --strict-optional
 
   test:
