@@ -43,5 +43,5 @@ sphinx-rtd-theme>=1.0.0
 
 # Utilities
 pyyaml>=6.0
-toml>=0.10.0
+toml>=0.10.2
 click>=8.0.0
