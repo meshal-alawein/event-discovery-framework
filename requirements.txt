@@ -17,7 +17,7 @@ tqdm>=4.62.0
 # Video processing
 ffmpeg-python>=0.2.0
 imageio>=2.9.0
-imageio-ffmpeg>=0.4.0
+imageio-ffmpeg>=0.6.0
 
 # Optional: Deep learning (for VLM baseline)
 # torch>=1.10.0
